@@ -14,4 +14,8 @@
 - [ ] Email notifications for the same (blocked: needs an email sender domain set up)
 - [ ] Campaign reporting: reach, engagement, deliverable status after the event
 - [ ] Profile verification badges so organizers see confirmed vs unverified details
+- [ ] Notification preferences (first): in-app and email toggle per alert type
+- [ ] Downloadable campaign reports (PDF via print + CSV)
+- [ ] Per-field verification status on creator profiles with written criteria
+- [x] Compare PDF vs CSV and recommend (answered: PDF to share, CSV for analysis)
 - [ ] Verify end-to-end flow, console errors

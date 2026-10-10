@@ -141,6 +141,7 @@ export type Database = {
           verification_docs: string[]
           verification_status: string
           verified: boolean
+          verified_fields: string[]
         }
         Insert: {
           audience_size?: number
@@ -159,6 +160,7 @@ export type Database = {
           verification_docs?: string[]
           verification_status?: string
           verified?: boolean
+          verified_fields?: string[]
         }
         Update: {
           audience_size?: number
@@ -177,6 +179,7 @@ export type Database = {
           verification_docs?: string[]
           verification_status?: string
           verified?: boolean
+          verified_fields?: string[]
         }
         Relationships: []
       }
@@ -270,6 +273,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_preferences: {
+        Row: {
+          email: boolean
+          in_app: boolean
+          kind: string
+          user_id: string
+        }
+        Insert: {
+          email?: boolean
+          in_app?: boolean
+          kind: string
+          user_id: string
+        }
+        Update: {
+          email?: boolean
+          in_app?: boolean
+          kind?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -501,6 +525,10 @@ export type Database = {
       }
       set_suspended: {
         Args: { _suspended: boolean; _user_id: string }
+        Returns: undefined
+      }
+      set_verified_fields: {
+        Args: { _creator_id: string; _fields: string[] }
         Returns: undefined
       }
     }
