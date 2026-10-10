@@ -13,7 +13,19 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedDiscoverRouteImport } from './routes/_authenticated/discover'
+import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedTicketsRouteImport } from './routes/_authenticated/tickets'
+import { Route as AuthenticatedAdminPlatformRouteImport } from './routes/_authenticated/admin.platform'
+import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin.reports'
+import { Route as AuthenticatedAdminVerifyRouteImport } from './routes/_authenticated/admin.verify'
+import { Route as AuthenticatedCreatorIdRouteImport } from './routes/_authenticated/creator.$id'
+import { Route as AuthenticatedCreatorDashboardRouteImport } from './routes/_authenticated/creator.dashboard'
+import { Route as AuthenticatedCreatorEventsRouteImport } from './routes/_authenticated/creator.events'
 import { Route as AuthenticatedEventsIdRouteImport } from './routes/_authenticated/events/$id'
+import { Route as AuthenticatedTicketsIdRouteImport } from './routes/_authenticated/tickets.$id'
+import { Route as AuthenticatedCreatorEventsCreateRouteImport } from './routes/_authenticated/creator.events.create'
+import { Route as AuthenticatedCreatorEventsIdManageRouteImport } from './routes/_authenticated/creator.events.$id.manage'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,23 +46,115 @@ const AuthenticatedDiscoverRoute = AuthenticatedDiscoverRouteImport.update({
   path: '/discover',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedNotificationsRoute =
+  AuthenticatedNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTicketsRoute = AuthenticatedTicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminPlatformRoute =
+  AuthenticatedAdminPlatformRouteImport.update({
+    id: '/admin/platform',
+    path: '/admin/platform',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminReportsRoute =
+  AuthenticatedAdminReportsRouteImport.update({
+    id: '/admin/reports',
+    path: '/admin/reports',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminVerifyRoute =
+  AuthenticatedAdminVerifyRouteImport.update({
+    id: '/admin/verify',
+    path: '/admin/verify',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedCreatorIdRoute = AuthenticatedCreatorIdRouteImport.update({
+  id: '/creator/$id',
+  path: '/creator/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedCreatorDashboardRoute =
+  AuthenticatedCreatorDashboardRouteImport.update({
+    id: '/creator/dashboard',
+    path: '/creator/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedCreatorEventsRoute =
+  AuthenticatedCreatorEventsRouteImport.update({
+    id: '/creator/events',
+    path: '/creator/events',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedEventsIdRoute = AuthenticatedEventsIdRouteImport.update({
   id: '/events/$id',
   path: '/events/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTicketsIdRoute = AuthenticatedTicketsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedTicketsRoute,
+} as any)
+const AuthenticatedCreatorEventsCreateRoute =
+  AuthenticatedCreatorEventsCreateRouteImport.update({
+    id: '/create',
+    path: '/create',
+    getParentRoute: () => AuthenticatedCreatorEventsRoute,
+  } as any)
+const AuthenticatedCreatorEventsIdManageRoute =
+  AuthenticatedCreatorEventsIdManageRouteImport.update({
+    id: '/$id/manage',
+    path: '/$id/manage',
+    getParentRoute: () => AuthenticatedCreatorEventsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/discover': typeof AuthenticatedDiscoverRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/tickets': typeof AuthenticatedTicketsRouteWithChildren
+  '/admin/platform': typeof AuthenticatedAdminPlatformRoute
+  '/admin/reports': typeof AuthenticatedAdminReportsRoute
+  '/admin/verify': typeof AuthenticatedAdminVerifyRoute
+  '/creator/$id': typeof AuthenticatedCreatorIdRoute
+  '/creator/dashboard': typeof AuthenticatedCreatorDashboardRoute
+  '/creator/events': typeof AuthenticatedCreatorEventsRouteWithChildren
   '/events/$id': typeof AuthenticatedEventsIdRoute
+  '/tickets/$id': typeof AuthenticatedTicketsIdRoute
+  '/creator/events/create': typeof AuthenticatedCreatorEventsCreateRoute
+  '/creator/events/$id/manage': typeof AuthenticatedCreatorEventsIdManageRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/discover': typeof AuthenticatedDiscoverRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/tickets': typeof AuthenticatedTicketsRouteWithChildren
+  '/admin/platform': typeof AuthenticatedAdminPlatformRoute
+  '/admin/reports': typeof AuthenticatedAdminReportsRoute
+  '/admin/verify': typeof AuthenticatedAdminVerifyRoute
+  '/creator/$id': typeof AuthenticatedCreatorIdRoute
+  '/creator/dashboard': typeof AuthenticatedCreatorDashboardRoute
+  '/creator/events': typeof AuthenticatedCreatorEventsRouteWithChildren
   '/events/$id': typeof AuthenticatedEventsIdRoute
+  '/tickets/$id': typeof AuthenticatedTicketsIdRoute
+  '/creator/events/create': typeof AuthenticatedCreatorEventsCreateRoute
+  '/creator/events/$id/manage': typeof AuthenticatedCreatorEventsIdManageRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -58,20 +162,76 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/discover': typeof AuthenticatedDiscoverRoute
+  '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/tickets': typeof AuthenticatedTicketsRouteWithChildren
+  '/_authenticated/admin/platform': typeof AuthenticatedAdminPlatformRoute
+  '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
+  '/_authenticated/admin/verify': typeof AuthenticatedAdminVerifyRoute
+  '/_authenticated/creator/$id': typeof AuthenticatedCreatorIdRoute
+  '/_authenticated/creator/dashboard': typeof AuthenticatedCreatorDashboardRoute
+  '/_authenticated/creator/events': typeof AuthenticatedCreatorEventsRouteWithChildren
   '/_authenticated/events/$id': typeof AuthenticatedEventsIdRoute
+  '/_authenticated/tickets/$id': typeof AuthenticatedTicketsIdRoute
+  '/_authenticated/creator/events/create': typeof AuthenticatedCreatorEventsCreateRoute
+  '/_authenticated/creator/events/$id/manage': typeof AuthenticatedCreatorEventsIdManageRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/discover' | '/events/$id'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/discover'
+    | '/notifications'
+    | '/profile'
+    | '/tickets'
+    | '/admin/platform'
+    | '/admin/reports'
+    | '/admin/verify'
+    | '/creator/$id'
+    | '/creator/dashboard'
+    | '/creator/events'
+    | '/events/$id'
+    | '/tickets/$id'
+    | '/creator/events/create'
+    | '/creator/events/$id/manage'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/discover' | '/events/$id'
+  to:
+    | '/'
+    | '/auth'
+    | '/discover'
+    | '/notifications'
+    | '/profile'
+    | '/tickets'
+    | '/admin/platform'
+    | '/admin/reports'
+    | '/admin/verify'
+    | '/creator/$id'
+    | '/creator/dashboard'
+    | '/creator/events'
+    | '/events/$id'
+    | '/tickets/$id'
+    | '/creator/events/create'
+    | '/creator/events/$id/manage'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/discover'
+    | '/_authenticated/notifications'
+    | '/_authenticated/profile'
+    | '/_authenticated/tickets'
+    | '/_authenticated/admin/platform'
+    | '/_authenticated/admin/reports'
+    | '/_authenticated/admin/verify'
+    | '/_authenticated/creator/$id'
+    | '/_authenticated/creator/dashboard'
+    | '/_authenticated/creator/events'
     | '/_authenticated/events/$id'
+    | '/_authenticated/tickets/$id'
+    | '/_authenticated/creator/events/create'
+    | '/_authenticated/creator/events/$id/manage'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -110,6 +270,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDiscoverRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/notifications': {
+      id: '/_authenticated/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tickets': {
+      id: '/_authenticated/tickets'
+      path: '/tickets'
+      fullPath: '/tickets'
+      preLoaderRoute: typeof AuthenticatedTicketsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/platform': {
+      id: '/_authenticated/admin/platform'
+      path: '/admin/platform'
+      fullPath: '/admin/platform'
+      preLoaderRoute: typeof AuthenticatedAdminPlatformRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/reports': {
+      id: '/_authenticated/admin/reports'
+      path: '/admin/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AuthenticatedAdminReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/verify': {
+      id: '/_authenticated/admin/verify'
+      path: '/admin/verify'
+      fullPath: '/admin/verify'
+      preLoaderRoute: typeof AuthenticatedAdminVerifyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/creator/$id': {
+      id: '/_authenticated/creator/$id'
+      path: '/creator/$id'
+      fullPath: '/creator/$id'
+      preLoaderRoute: typeof AuthenticatedCreatorIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/creator/dashboard': {
+      id: '/_authenticated/creator/dashboard'
+      path: '/creator/dashboard'
+      fullPath: '/creator/dashboard'
+      preLoaderRoute: typeof AuthenticatedCreatorDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/creator/events': {
+      id: '/_authenticated/creator/events'
+      path: '/creator/events'
+      fullPath: '/creator/events'
+      preLoaderRoute: typeof AuthenticatedCreatorEventsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/events/$id': {
       id: '/_authenticated/events/$id'
       path: '/events/$id'
@@ -117,16 +340,84 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEventsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/tickets/$id': {
+      id: '/_authenticated/tickets/$id'
+      path: '/$id'
+      fullPath: '/tickets/$id'
+      preLoaderRoute: typeof AuthenticatedTicketsIdRouteImport
+      parentRoute: typeof AuthenticatedTicketsRoute
+    }
+    '/_authenticated/creator/events/create': {
+      id: '/_authenticated/creator/events/create'
+      path: '/create'
+      fullPath: '/creator/events/create'
+      preLoaderRoute: typeof AuthenticatedCreatorEventsCreateRouteImport
+      parentRoute: typeof AuthenticatedCreatorEventsRoute
+    }
+    '/_authenticated/creator/events/$id/manage': {
+      id: '/_authenticated/creator/events/$id/manage'
+      path: '/$id/manage'
+      fullPath: '/creator/events/$id/manage'
+      preLoaderRoute: typeof AuthenticatedCreatorEventsIdManageRouteImport
+      parentRoute: typeof AuthenticatedCreatorEventsRoute
+    }
   }
 }
 
+interface AuthenticatedTicketsRouteChildren {
+  AuthenticatedTicketsIdRoute: typeof AuthenticatedTicketsIdRoute
+}
+
+const AuthenticatedTicketsRouteChildren: AuthenticatedTicketsRouteChildren = {
+  AuthenticatedTicketsIdRoute: AuthenticatedTicketsIdRoute,
+}
+
+const AuthenticatedTicketsRouteWithChildren =
+  AuthenticatedTicketsRoute._addFileChildren(AuthenticatedTicketsRouteChildren)
+
+interface AuthenticatedCreatorEventsRouteChildren {
+  AuthenticatedCreatorEventsCreateRoute: typeof AuthenticatedCreatorEventsCreateRoute
+  AuthenticatedCreatorEventsIdManageRoute: typeof AuthenticatedCreatorEventsIdManageRoute
+}
+
+const AuthenticatedCreatorEventsRouteChildren: AuthenticatedCreatorEventsRouteChildren =
+  {
+    AuthenticatedCreatorEventsCreateRoute:
+      AuthenticatedCreatorEventsCreateRoute,
+    AuthenticatedCreatorEventsIdManageRoute:
+      AuthenticatedCreatorEventsIdManageRoute,
+  }
+
+const AuthenticatedCreatorEventsRouteWithChildren =
+  AuthenticatedCreatorEventsRoute._addFileChildren(
+    AuthenticatedCreatorEventsRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDiscoverRoute: typeof AuthenticatedDiscoverRoute
+  AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedTicketsRoute: typeof AuthenticatedTicketsRouteWithChildren
+  AuthenticatedAdminPlatformRoute: typeof AuthenticatedAdminPlatformRoute
+  AuthenticatedAdminReportsRoute: typeof AuthenticatedAdminReportsRoute
+  AuthenticatedAdminVerifyRoute: typeof AuthenticatedAdminVerifyRoute
+  AuthenticatedCreatorIdRoute: typeof AuthenticatedCreatorIdRoute
+  AuthenticatedCreatorDashboardRoute: typeof AuthenticatedCreatorDashboardRoute
+  AuthenticatedCreatorEventsRoute: typeof AuthenticatedCreatorEventsRouteWithChildren
   AuthenticatedEventsIdRoute: typeof AuthenticatedEventsIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDiscoverRoute: AuthenticatedDiscoverRoute,
+  AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedTicketsRoute: AuthenticatedTicketsRouteWithChildren,
+  AuthenticatedAdminPlatformRoute: AuthenticatedAdminPlatformRoute,
+  AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
+  AuthenticatedAdminVerifyRoute: AuthenticatedAdminVerifyRoute,
+  AuthenticatedCreatorIdRoute: AuthenticatedCreatorIdRoute,
+  AuthenticatedCreatorDashboardRoute: AuthenticatedCreatorDashboardRoute,
+  AuthenticatedCreatorEventsRoute: AuthenticatedCreatorEventsRouteWithChildren,
   AuthenticatedEventsIdRoute: AuthenticatedEventsIdRoute,
 }
 

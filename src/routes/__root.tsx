@@ -23,7 +23,10 @@ function NotFoundComponent() {
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
         <p className="mt-2 text-sm text-muted-foreground">This page doesn't exist or has moved.</p>
         <div className="mt-6">
-          <Link to="/" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-primary-foreground">
+          <Link
+            to="/"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-primary-foreground"
+          >
             Go to Discover
           </Link>
         </div>
@@ -41,8 +44,12 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">This page didn't load</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Something went wrong. Try again or go back home.</p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          This page didn't load
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Something went wrong. Try again or go back home.
+        </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
@@ -53,7 +60,10 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
           >
             Try again
           </button>
-          <a href="/" className="inline-flex min-h-11 items-center justify-center rounded-xl border bg-card px-5 text-sm font-semibold text-foreground">
+          <a
+            href="/"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border bg-card px-5 text-sm font-semibold text-foreground"
+          >
             Go home
           </a>
         </div>
@@ -68,16 +78,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "CreatorConnect — Meet creators in person" },
-      { name: "description", content: "Discover and register for creator meetups, workshops and launches near you." },
+      {
+        name: "description",
+        content: "Discover and register for creator meetups, workshops and launches near you.",
+      },
       { property: "og:title", content: "CreatorConnect — Meet creators in person" },
-      { property: "og:description", content: "Discover and register for creator meetups, workshops and launches near you." },
+      {
+        property: "og:description",
+        content: "Discover and register for creator meetups, workshops and launches near you.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap",
+      },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
@@ -119,7 +138,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="mx-auto min-h-screen max-w-[440px] bg-background shadow-2xl ring-1 ring-border">
+      <div className="min-h-screen bg-background text-foreground antialiased">
         <Outlet />
       </div>
       <Toaster position="top-center" />

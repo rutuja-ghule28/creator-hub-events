@@ -21,21 +21,49 @@ export const NICHES = [
 ] as const;
 
 export const ALERT_KINDS = [
-  { kind: "application", label: "Application updates", hint: "When someone applies or your application is reviewed" },
+  {
+    kind: "application",
+    label: "Application updates",
+    hint: "When someone applies or your application is reviewed",
+  },
   { kind: "campaign", label: "New matching campaigns", hint: "Campaigns that fit your niche" },
   { kind: "deadline", label: "Approaching deadlines", hint: "48 hours before applications close" },
   { kind: "event", label: "New events from creators you follow", hint: "When an event goes live" },
-  { kind: "announcement", label: "Organiser updates", hint: "Announcements for events you follow or attend" },
-  { kind: "verification", label: "Verification results", hint: "When your creator request is reviewed" },
+  {
+    kind: "announcement",
+    label: "Organiser updates",
+    hint: "Announcements for events you follow or attend",
+  },
+  {
+    kind: "verification",
+    label: "Verification results",
+    hint: "When your creator request is reviewed",
+  },
 ] as const;
 
 export const VERIFIABLE_FIELDS = [
   { key: "name", label: "Name", criteria: "Matches a government ID or an official public page." },
   { key: "niche", label: "Niche", criteria: "Most recent posts match the stated category." },
-  { key: "audience", label: "Audience size", criteria: "Confirmed from analytics or a profile screenshot from the last 30 days, within 10%." },
-  { key: "location", label: "Location", criteria: "Confirmed from ID, proof of address or past local events." },
-  { key: "portfolio", label: "Portfolio links", criteria: "Every link opens and belongs to the creator." },
-  { key: "contact", label: "Contact details", criteria: "Email or phone confirmed by a reply or a code." },
+  {
+    key: "audience",
+    label: "Audience size",
+    criteria: "Confirmed from analytics or a profile screenshot from the last 30 days, within 10%.",
+  },
+  {
+    key: "location",
+    label: "Location",
+    criteria: "Confirmed from ID, proof of address or past local events.",
+  },
+  {
+    key: "portfolio",
+    label: "Portfolio links",
+    criteria: "Every link opens and belongs to the creator.",
+  },
+  {
+    key: "contact",
+    label: "Contact details",
+    criteria: "Email or phone confirmed by a reply or a code.",
+  },
 ] as const;
 
 export type Me = {
@@ -75,10 +103,19 @@ export function useMe() {
 
 const tz = "Asia/Kolkata";
 export function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: tz });
+  return new Date(iso).toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: tz,
+  });
 }
 export function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: tz });
+  return new Date(iso).toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: tz,
+  });
 }
 export function fmtDateTime(iso: string) {
   return `${fmtDate(iso)} · ${fmtTime(iso)}`;
@@ -99,7 +136,8 @@ export function seatsLeft(e: Pick<EventRow, "capacity" | "seats_taken">) {
   return Math.max(0, e.capacity - e.seats_taken);
 }
 export function errMsg(e: unknown) {
-  if (e && typeof e === "object" && "message" in e) return String((e as { message: string }).message);
+  if (e && typeof e === "object" && "message" in e)
+    return String((e as { message: string }).message);
   return "Something went wrong. Please try again.";
 }
 export const EVENT_SELECT = "*, creator:creators(*)";
