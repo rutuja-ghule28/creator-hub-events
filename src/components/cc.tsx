@@ -23,7 +23,7 @@ function hash(s: string) {
 export function EventCover({ id, src, className, alt }: { id: string; src?: string | null; className?: string; alt: string }) {
   if (src) return <img src={src} alt={alt} className={cn("object-cover", className)} />;
   const h = hash(id);
-  const [a, b, c] = PALETTES[h % PALETTES.length];
+  const [a, b, c] = PALETTES[h % PALETTES.length] ?? PALETTES[0]!;
   const tilt = (h % 30) - 15;
   const gid = `g${h}`;
   const heads = Array.from({ length: 14 }, (_, i) => ({ x: i * 30 + ((h >> i) % 12), r: 11 + ((h >> (i + 2)) % 6) }));
@@ -227,7 +227,7 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
           <li key={t.to} className="flex-1">
             <Link
               to={t.to}
-              activeOptions={{ exact: t.exact }}
+              activeOptions={{ exact: !!t.exact }}
               className="group flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground"
               activeProps={{ className: "is-active text-foreground" }}
             >
