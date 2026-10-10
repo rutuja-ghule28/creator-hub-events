@@ -10,4 +10,8 @@
 - [ ] Event listings: promotion brief and application deadline
 - [ ] Organizers discover and filter creators by niche, location, audience size
 - [ ] Creators apply to event campaigns; organizers review applications
+- [ ] In-app notifications: application updates, new matching campaigns, approaching deadlines
+- [ ] Email notifications for the same (blocked: needs an email sender domain set up)
+- [ ] Campaign reporting: reach, engagement, deliverable status after the event
+- [ ] Profile verification badges so organizers see confirmed vs unverified details
 - [ ] Verify end-to-end flow, console errors
