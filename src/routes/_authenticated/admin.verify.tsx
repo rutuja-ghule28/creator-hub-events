@@ -18,7 +18,33 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/admin/verify")({
   head: () => ({
-    meta: [{ title: "Admin Verification Queue — CreatorConnect" }],
+    meta: [
+      { title: "Admin Creator Verification — CreatorConnect" },
+      {
+        name: "description",
+        content:
+          "Review creator verification applications, credentials, and official trust badges.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Admin Creator Verification — CreatorConnect" },
+      {
+        property: "og:description",
+        content:
+          "Review creator verification applications, credentials, and official trust badges.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://creatorconnect.app/admin/verify" },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Admin Creator Verification — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "Review creator verification applications, credentials, and official trust badges.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [{ rel: "canonical", href: "https://creatorconnect.app/admin/verify" }],
   }),
   component: AdminVerifyPage,
 });

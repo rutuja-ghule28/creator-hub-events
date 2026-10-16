@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%" fill="none" aria-label="Creator Connect Icon">
+  <defs>
+    <linearGradient id="cc-icon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="35%" stop-color="#7C3AED" />
+      <stop offset="70%" stop-color="#EC4899" />
+      <stop offset="100%" stop-color="#F97316" />
+    </linearGradient>
+    <linearGradient id="cc-icon-spark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFBEB" />
+      <stop offset="100%" stop-color="#FBBF24" />
+    </linearGradient>
+    <filter id="cc-icon-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Ambient Glow -->
+  <circle cx="50" cy="50" r="42" fill="url(#cc-icon-gradient)" opacity="0.12" filter="url(#cc-icon-glow)" />
+
+  <!-- Dynamic Curved Connect Ribbon Forming Stylized 'C' -->
+  <path
+    d="M 68 24
+       C 40 18, 16 34, 16 52
+       C 16 70, 40 84, 68 78"
+    stroke="url(#cc-icon-gradient)"
+    stroke-width="12"
+    stroke-linecap="round"
+  />
+
+  <!-- Inner Interlocking Bridge -->
+  <path
+    d="M 68 34
+       C 52 38, 38 46, 38 52
+       C 38 58, 52 64, 68 68"
+    stroke="url(#cc-icon-gradient)"
+    stroke-width="6"
+    stroke-linecap="round"
+    opacity="0.6"
+  />
+
+  <!-- Creator Node Top -->
+  <circle cx="70" cy="24" r="11" fill="url(#cc-icon-gradient)" />
+  <circle cx="70" cy="24" r="5" fill="#FFFFFF" />
+
+  <!-- Creator Node Bottom -->
+  <circle cx="70" cy="78" r="11" fill="url(#cc-icon-gradient)" />
+  <circle cx="70" cy="78" r="5" fill="#FFFFFF" />
+
+  <!-- Connection Spark (Point of Collaboration) -->
+  <g transform="translate(48, 51)">
+    <path
+      d="M 0 -10 Q 0 0 10 0 Q 0 0 0 10 Q 0 0 -10 0 Q 0 0 0 -10 Z"
+      fill="url(#cc-icon-spark)"
+      filter="url(#cc-icon-glow)"
+    />
+    <circle cx="0" cy="0" r="2.5" fill="#FFFFFF" />
+  </g>
+</svg>

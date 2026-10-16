@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" fill="none" aria-label="Creator Connect Social Card">
+  <defs>
+    <linearGradient id="og-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090D16" />
+      <stop offset="50%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#1E1035" />
+    </linearGradient>
+    <linearGradient id="og-brand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1" />
+      <stop offset="35%" stop-color="#8B5CF6" />
+      <stop offset="70%" stop-color="#EC4899" />
+      <stop offset="100%" stop-color="#F97316" />
+    </linearGradient>
+    <linearGradient id="og-spark-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFBEB" />
+      <stop offset="100%" stop-color="#FBBF24" />
+    </linearGradient>
+    <radialGradient id="og-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="og-glow2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#EC4899" stop-opacity="0.22" />
+      <stop offset="100%" stop-color="#EC4899" stop-opacity="0" />
+    </radialGradient>
+    <filter id="og-blur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#og-bg)" />
+
+  <!-- Ambient Glow Orbs -->
+  <circle cx="150" cy="120" r="320" fill="url(#og-glow)" />
+  <circle cx="1050" cy="500" r="380" fill="url(#og-glow2)" />
+
+  <!-- Grid overlay -->
+  <g stroke="#334155" stroke-opacity="0.15" stroke-width="1">
+    <line x1="100" y1="0" x2="100" y2="630" />
+    <line x1="300" y1="0" x2="300" y2="630" />
+    <line x1="500" y1="0" x2="500" y2="630" />
+    <line x1="700" y1="0" x2="700" y2="630" />
+    <line x1="900" y1="0" x2="900" y2="630" />
+    <line x1="1100" y1="0" x2="1100" y2="630" />
+    <line x1="0" y1="120" x2="1200" y2="120" />
+    <line x1="0" y1="260" x2="1200" y2="260" />
+    <line x1="0" y1="400" x2="1200" y2="400" />
+    <line x1="0" y1="540" x2="1200" y2="540" />
+  </g>
+
+  <!-- Card Border -->
+  <rect x="24" y="24" width="1152" height="582" rx="32" stroke="#334155" stroke-opacity="0.4" stroke-width="2" />
+
+  <!-- Top Brand Mark -->
+  <g transform="translate(100, 95)">
+    <!-- Icon -->
+    <g transform="scale(0.85)">
+      <circle cx="50" cy="50" r="42" fill="url(#og-brand-grad)" opacity="0.25" filter="url(#og-blur)" />
+      <path d="M 68 24 C 40 18, 16 34, 16 52 C 16 70, 40 84, 68 78" stroke="url(#og-brand-grad)" stroke-width="12" stroke-linecap="round" />
+      <path d="M 68 34 C 52 38, 38 46, 38 52 C 38 58, 52 64, 68 68" stroke="url(#og-brand-grad)" stroke-width="6" stroke-linecap="round" opacity="0.75" />
+      <circle cx="70" cy="24" r="11" fill="url(#og-brand-grad)" />
+      <circle cx="70" cy="24" r="5" fill="#FFFFFF" />
+      <circle cx="70" cy="78" r="11" fill="url(#og-brand-grad)" />
+      <circle cx="70" cy="78" r="5" fill="#FFFFFF" />
+      <g transform="translate(48, 51)">
+        <path d="M 0 -10 Q 0 0 10 0 Q 0 0 0 10 Q 0 0 -10 0 Q 0 0 0 -10 Z" fill="url(#og-spark-grad)" filter="url(#og-blur)" />
+        <circle cx="0" cy="0" r="2.5" fill="#FFFFFF" />
+      </g>
+    </g>
+
+    <!-- Wordmark -->
+    <text x="105" y="55" font-family="'Sora', 'Figtree', system-ui, sans-serif" font-size="38" font-weight="700" fill="#F8FAFC" letter-spacing="-0.8px">Creator<tspan fill="url(#og-brand-grad)" font-weight="800">Connect</tspan></text>
+  </g>
+
+  <!-- Location Badge -->
+  <g transform="translate(940, 115)">
+    <rect width="160" height="42" rx="21" fill="#1E293B" stroke="#475569" stroke-width="1.5" />
+    <circle cx="28" cy="21" r="6" fill="#10B981" />
+    <text x="44" y="27" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">Pune, India</text>
+  </g>
+
+  <!-- Hero Headline -->
+  <g transform="translate(100, 280)">
+    <text font-family="'Sora', 'Figtree', system-ui, sans-serif" font-size="56" font-weight="800" fill="#FFFFFF" letter-spacing="-1.5px">
+      Meet your favourite
+    </text>
+    <text y="72" font-family="'Sora', 'Figtree', system-ui, sans-serif" font-size="56" font-weight="800" fill="url(#og-brand-grad)" letter-spacing="-1.5px">
+      creators, in person.
+    </text>
+  </g>
+
+  <!-- Description -->
+  <text x="100" y="420" font-family="'Figtree', system-ui, sans-serif" font-size="24" font-weight="500" fill="#94A3B8">
+    Discover and register for official meetups, workshops, live podcasts, and launches.
+  </text>
+
+  <!-- Feature Pills -->
+  <g transform="translate(100, 485)">
+    <!-- Pill 1 -->
+    <g>
+      <rect width="260" height="46" rx="23" fill="#1E293B" stroke="#334155" stroke-width="1.5" />
+      <text x="24" y="29" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#CBD5E1">✓ 100% Official Events</text>
+    </g>
+    <!-- Pill 2 -->
+    <g transform="translate(280, 0)">
+      <rect width="250" height="46" rx="23" fill="#1E293B" stroke="#334155" stroke-width="1.5" />
+      <text x="24" y="29" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#CBD5E1">✓ Verified Badges</text>
+    </g>
+    <!-- Pill 3 -->
+    <g transform="translate(550, 0)">
+      <rect width="280" height="46" rx="23" fill="#1E293B" stroke="#334155" stroke-width="1.5" />
+      <text x="24" y="29" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#CBD5E1">✓ Instant QR Entry Passes</text>
+    </g>
+  </g>
+</svg>

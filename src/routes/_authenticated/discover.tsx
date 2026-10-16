@@ -11,19 +11,32 @@ import { Input } from "@/components/ui/input";
 export const Route = createFileRoute("/_authenticated/discover")({
   head: () => ({
     meta: [
-      { title: "Discover creator events — CreatorConnect" },
+      { title: "Discover Creator Events in Pune — CreatorConnect" },
       {
         name: "description",
-        content: "Find official creator meetups, workshops and launches in Pune.",
+        content:
+          "Explore verified creator meetups, acoustic nights, workshops, and tech launches in Pune.",
       },
-      { property: "og:title", content: "Discover creator events — CreatorConnect" },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Discover Creator Events in Pune — CreatorConnect" },
       {
         property: "og:description",
-        content: "Find official creator meetups, workshops and launches in Pune.",
+        content:
+          "Explore verified creator meetups, acoustic nights, workshops, and tech launches in Pune.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://creatorconnect.app/discover" },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Discover Creator Events in Pune — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "Explore verified creator meetups, acoustic nights, workshops, and tech launches in Pune.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
     ],
+    links: [{ rel: "canonical", href: "https://creatorconnect.app/discover" }],
   }),
   component: Discover,
 });

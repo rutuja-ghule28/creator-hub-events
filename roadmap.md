@@ -1,8 +1,8 @@
 # CreatorConnect roadmap
 
-- [ ] Database, roles, RLS, triggers, seed data + demo accounts
-- [ ] Design system (tokens, fonts, SVG covers, trust badges)
-- [ ] Auth page with demo logins
+- [x] Database, roles, RLS, triggers, seed data
+- [x] Design system (tokens, fonts, SVG covers, trust badges)
+- [x] Auth page with strict email + password authentication
 - [ ] Attendee: Discover, event details, register, ticket QR, tickets, saved, creator profile, notifications (realtime), profile, report, become a creator
 - [ ] Creator: overview, events, create event, manage (attendees check-in, announcements)
 - [ ] Admin: verify, reports, platform

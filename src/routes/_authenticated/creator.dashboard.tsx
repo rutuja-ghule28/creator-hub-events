@@ -15,7 +15,33 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/creator/dashboard")({
   head: () => ({
-    meta: [{ title: "Creator Dashboard — CreatorConnect" }],
+    meta: [
+      { title: "Creator Hub Dashboard — CreatorConnect" },
+      {
+        name: "description",
+        content:
+          "Manage your creator events, track registrations, ticket sales, and audience check-ins.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Creator Hub Dashboard — CreatorConnect" },
+      {
+        property: "og:description",
+        content:
+          "Manage your creator events, track registrations, ticket sales, and audience check-ins.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://creatorconnect.app/creator/dashboard" },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Creator Hub Dashboard — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "Manage your creator events, track registrations, ticket sales, and audience check-ins.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [{ rel: "canonical", href: "https://creatorconnect.app/creator/dashboard" }],
   }),
   component: CreatorDashboardPage,
 });

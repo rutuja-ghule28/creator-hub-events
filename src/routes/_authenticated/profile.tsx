@@ -11,7 +11,33 @@ import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
-    meta: [{ title: "Profile & Settings — CreatorConnect" }],
+    meta: [
+      { title: "Your Profile & Settings — CreatorConnect" },
+      {
+        name: "description",
+        content:
+          "Manage your CreatorConnect attendee account, notifications preferences, and verification details.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Your Profile & Settings — CreatorConnect" },
+      {
+        property: "og:description",
+        content:
+          "Manage your CreatorConnect attendee account, notifications preferences, and verification details.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://creatorconnect.app/profile" },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Your Profile & Settings — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "Manage your CreatorConnect attendee account, notifications preferences, and verification details.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [{ rel: "canonical", href: "https://creatorconnect.app/profile" }],
   }),
   component: ProfilePage,
 });

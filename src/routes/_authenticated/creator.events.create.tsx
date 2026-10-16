@@ -10,7 +10,30 @@ import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/creator/events/create")({
   head: () => ({
-    meta: [{ title: "Create Event — CreatorConnect" }],
+    meta: [
+      { title: "Host a New Event — CreatorConnect" },
+      {
+        name: "description",
+        content: "Create and publish official creator meetups, workshops, and ticketed sessions.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Host a New Event — CreatorConnect" },
+      {
+        property: "og:description",
+        content: "Create and publish official creator meetups, workshops, and ticketed sessions.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://creatorconnect.app/creator/events/create" },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Host a New Event — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content: "Create and publish official creator meetups, workshops, and ticketed sessions.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [{ rel: "canonical", href: "https://creatorconnect.app/creator/events/create" }],
   }),
   component: CreateEventPage,
 });

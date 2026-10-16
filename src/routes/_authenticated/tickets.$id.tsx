@@ -9,8 +9,31 @@ import { CreatorName, ErrorState, EventCover, ListSkeleton, OfficialSeal } from 
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/tickets/$id")({
-  head: () => ({
-    meta: [{ title: "Ticket Pass — CreatorConnect" }],
+  head: ({ params }) => ({
+    meta: [
+      { title: "Event Ticket & QR Entry Pass — CreatorConnect" },
+      {
+        name: "description",
+        content: "Access your verified event QR ticket pass for express check-in at the venue.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Event Ticket & QR Entry Pass — CreatorConnect" },
+      {
+        property: "og:description",
+        content: "Access your verified event QR ticket pass for express check-in at the venue.",
+      },
+      { property: "og:type", content: "article" },
+      { property: "og:url", content: `https://creatorconnect.app/tickets/${params.id}` },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Event Ticket & QR Entry Pass — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content: "Access your verified event QR ticket pass for express check-in at the venue.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [{ rel: "canonical", href: `https://creatorconnect.app/tickets/${params.id}` }],
   }),
   component: TicketDetailPage,
 });

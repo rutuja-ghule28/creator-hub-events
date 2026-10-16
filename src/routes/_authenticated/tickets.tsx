@@ -10,12 +10,32 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/_authenticated/tickets")({
   head: () => ({
     meta: [
-      { title: "My Tickets & Saved — CreatorConnect" },
+      { title: "My Tickets & Passes — CreatorConnect" },
       {
         name: "description",
-        content: "View your event passes, ticket QR codes, and saved creator events.",
+        content:
+          "View your booked event tickets, entry passes, QR codes, and seat confirmation details.",
       },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "My Tickets & Passes — CreatorConnect" },
+      {
+        property: "og:description",
+        content:
+          "View your booked event tickets, entry passes, QR codes, and seat confirmation details.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://creatorconnect.app/tickets" },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "My Tickets & Passes — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "View your booked event tickets, entry passes, QR codes, and seat confirmation details.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
     ],
+    links: [{ rel: "canonical", href: "https://creatorconnect.app/tickets" }],
   }),
   component: TicketsPage,
 });

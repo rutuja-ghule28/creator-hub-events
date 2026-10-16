@@ -10,7 +10,33 @@ import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/_authenticated/creator/events")({
   head: () => ({
-    meta: [{ title: "My Events Table — CreatorConnect" }],
+    meta: [
+      { title: "Manage Creator Events — CreatorConnect" },
+      {
+        name: "description",
+        content:
+          "Overview of all your hosted and upcoming creator events, capacity, and check-in status.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Manage Creator Events — CreatorConnect" },
+      {
+        property: "og:description",
+        content:
+          "Overview of all your hosted and upcoming creator events, capacity, and check-in status.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://creatorconnect.app/creator/events" },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Manage Creator Events — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "Overview of all your hosted and upcoming creator events, capacity, and check-in status.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [{ rel: "canonical", href: "https://creatorconnect.app/creator/events" }],
   }),
   component: CreatorEventsTablePage,
 });

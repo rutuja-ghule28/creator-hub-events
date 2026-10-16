@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="cc-fav-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="35%" stop-color="#7C3AED" />
+      <stop offset="70%" stop-color="#EC4899" />
+      <stop offset="100%" stop-color="#F97316" />
+    </linearGradient>
+    <linearGradient id="cc-fav-spark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFBEB" />
+      <stop offset="100%" stop-color="#FBBF24" />
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="#0F172A" />
+  <path
+    d="M 70 26
+       C 42 20, 18 36, 18 52
+       C 18 68, 42 82, 70 76"
+    stroke="url(#cc-fav-grad)"
+    stroke-width="12"
+    stroke-linecap="round"
+  />
+  <circle cx="72" cy="26" r="10" fill="url(#cc-fav-grad)" />
+  <circle cx="72" cy="26" r="4.5" fill="#FFFFFF" />
+  <circle cx="72" cy="76" r="10" fill="url(#cc-fav-grad)" />
+  <circle cx="72" cy="76" r="4.5" fill="#FFFFFF" />
+  <g transform="translate(50, 51)">
+    <path
+      d="M 0 -9 Q 0 0 9 0 Q 0 0 0 9 Q 0 0 -9 0 Q 0 0 0 -9 Z"
+      fill="url(#cc-fav-spark)"
+    />
+  </g>
+</svg>

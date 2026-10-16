@@ -44,15 +44,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/events/$id")({
-  head: () => ({
+  head: ({ params }) => ({
     meta: [
-      { title: "Event details — CreatorConnect" },
-      { name: "description", content: "See date, venue, seats left and organiser updates." },
-      { property: "og:title", content: "Event details — CreatorConnect" },
-      { property: "og:description", content: "See date, venue, seats left and organiser updates." },
+      { title: "Event Details & Tickets — CreatorConnect" },
+      {
+        name: "description",
+        content:
+          "Check event schedule, venue details, creator profiles, and available tickets for upcoming meetups.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Event Details & Tickets — CreatorConnect" },
+      {
+        property: "og:description",
+        content:
+          "Check event schedule, venue details, creator profiles, and available tickets for upcoming meetups.",
+      },
       { property: "og:type", content: "article" },
+      { property: "og:url", content: `https://creatorconnect.app/events/${params.id}` },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Event Details & Tickets — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "Check event schedule, venue details, creator profiles, and available tickets for upcoming meetups.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
     ],
+    links: [{ rel: "canonical", href: `https://creatorconnect.app/events/${params.id}` }],
   }),
   component: EventPage,
 });

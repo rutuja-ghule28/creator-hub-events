@@ -48,7 +48,18 @@ export function EventCover({
   className?: string;
   alt: string;
 }) {
-  if (src) return <img src={src} alt={alt} className={cn("object-cover", className)} />;
+  if (src)
+    return (
+      <img
+        src={src}
+        alt={alt || "Event cover image"}
+        width={400}
+        height={240}
+        loading="lazy"
+        decoding="async"
+        className={cn("object-cover", className)}
+      />
+    );
   const h = hash(id);
   const [a, b, c] = PALETTES[h % PALETTES.length] ?? PALETTES[0]!;
   const tilt = (h % 30) - 15;
@@ -157,7 +168,11 @@ export function Avatar({
     return (
       <img
         src={src}
-        alt=""
+        alt={name ? `${name}'s profile avatar` : "Creator profile avatar"}
+        width={size}
+        height={size}
+        loading="lazy"
+        decoding="async"
         className="rounded-full object-cover"
         style={{ width: size, height: size }}
       />
@@ -435,11 +450,18 @@ export function DesktopSidebar({ me }: { me?: Me | null | undefined }) {
           to="/discover"
           className="flex items-center gap-3 group rounded-xl p-1 focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-brand text-primary-foreground shadow-brand group-hover:scale-105 transition-transform">
-            <Sparkles className="size-5" />
-          </span>
+          <img
+            src="/assets/logo-icon.svg"
+            alt="CreatorConnect"
+            width={36}
+            height={36}
+            className="size-9 shrink-0 transition-transform group-hover:scale-105"
+          />
           <span className="hidden lg:inline font-display text-xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-            CreatorConnect
+            Creator
+            <span className="bg-gradient-to-r from-brand via-primary to-rose-500 bg-clip-text text-transparent">
+              Connect
+            </span>
           </span>
         </Link>
       </div>
