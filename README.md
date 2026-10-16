@@ -93,33 +93,19 @@ SEED DATA (Pune, India)
 
 - 5 live events: "Sunset Acoustic Meetup" (Koregaon Park Amphitheatre), "Fan Meet & Greet with Aarav Kulkarni" (Balewadi Sports Complex Hall), "Reel Craft Workshop" (Baner Creator Studio), "Neon Beats Earbuds Launch" (Hinjewadi Tech Hub), "Open Mic Community Night" (Kalyani Nagar Café Stage). Use future dates, capacities between 30 and 200, and some already partly booked.
 - 4 verified creators (Meera Joshi, Aarav Kulkarni, Kabir Sharma, Ishaan Deshmukh), 2 creators waiting for verification (Tara Nair, Nikita Rao), 2 pending events, 2 reports.
-- Create demo accounts: one attendee, one creator (Meera Joshi) and one admin, and show their logins on the sign-in page for testing.
+- Authentication: Strict Email + Password login (sessions are session-only and never persist across browser visits).
 
 =====================
 QUALITY
 =====================
 
-Make it work well at 390px wide, and on desktop show the app in a centered phone-width layout. Include loading, error and empty states everywhere. Check for console errors and fix them before finishing.
-
-This project was built with [Lovable](https://lovable.dev).
-
-**Live app**: https://creator-hub-events.lovable.app
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/7c55d8ac-c7a6-4de3-a1f5-615cc9877693).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+Make it work well at 390px wide, and on desktop show the app in a responsive layout. Include loading, error and empty states everywhere.
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Run the project locally with Node.js and npm:
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm install
 npm run dev
 ```

@@ -11,7 +11,33 @@ import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/_authenticated/admin/platform")({
   head: () => ({
-    meta: [{ title: "Platform Management — CreatorConnect" }],
+    meta: [
+      { title: "Platform Analytics & Users — CreatorConnect" },
+      {
+        name: "description",
+        content:
+          "Platform overview, user directory, suspension controls, and event health analytics.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Platform Analytics & Users — CreatorConnect" },
+      {
+        property: "og:description",
+        content:
+          "Platform overview, user directory, suspension controls, and event health analytics.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://creatorconnect.app/admin/platform" },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Platform Analytics & Users — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "Platform overview, user directory, suspension controls, and event health analytics.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [{ rel: "canonical", href: "https://creatorconnect.app/admin/platform" }],
   }),
   component: AdminPlatformPage,
 });

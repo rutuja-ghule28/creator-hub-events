@@ -17,7 +17,30 @@ import {
 
 export const Route = createFileRoute("/_authenticated/admin/reports")({
   head: () => ({
-    meta: [{ title: "Admin Reports Table — CreatorConnect" }],
+    meta: [
+      { title: "Admin Reports & Flags — CreatorConnect" },
+      {
+        name: "description",
+        content: "Audit and review user flags, safety reports, and community compliance reports.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Admin Reports & Flags — CreatorConnect" },
+      {
+        property: "og:description",
+        content: "Audit and review user flags, safety reports, and community compliance reports.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://creatorconnect.app/admin/reports" },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Admin Reports & Flags — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content: "Audit and review user flags, safety reports, and community compliance reports.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [{ rel: "canonical", href: "https://creatorconnect.app/admin/reports" }],
   }),
   component: AdminReportsPage,
 });

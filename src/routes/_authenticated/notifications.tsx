@@ -9,7 +9,33 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/notifications")({
   head: () => ({
-    meta: [{ title: "Notifications — CreatorConnect" }],
+    meta: [
+      { title: "Notifications & Updates — CreatorConnect" },
+      {
+        name: "description",
+        content:
+          "Stay informed with event announcements, registration confirmations, and creator updates.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Notifications & Updates — CreatorConnect" },
+      {
+        property: "og:description",
+        content:
+          "Stay informed with event announcements, registration confirmations, and creator updates.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://creatorconnect.app/notifications" },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Notifications & Updates — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "Stay informed with event announcements, registration confirmations, and creator updates.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [{ rel: "canonical", href: "https://creatorconnect.app/notifications" }],
   }),
   component: NotificationsPage,
 });

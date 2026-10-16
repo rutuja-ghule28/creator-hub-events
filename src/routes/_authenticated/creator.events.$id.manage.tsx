@@ -10,8 +10,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/_authenticated/creator/events/$id/manage")({
-  head: () => ({
-    meta: [{ title: "Manage Event — CreatorConnect" }],
+  head: ({ params }) => ({
+    meta: [
+      { title: "Event Attendee Management — CreatorConnect" },
+      {
+        name: "description",
+        content:
+          "Scan QR passes, verify attendee check-ins, and broadcast announcements for your event.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Event Attendee Management — CreatorConnect" },
+      {
+        property: "og:description",
+        content:
+          "Scan QR passes, verify attendee check-ins, and broadcast announcements for your event.",
+      },
+      { property: "og:type", content: "website" },
+      {
+        property: "og:url",
+        content: `https://creatorconnect.app/creator/events/${params.id}/manage`,
+      },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Event Attendee Management — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "Scan QR passes, verify attendee check-ins, and broadcast announcements for your event.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [
+      { rel: "canonical", href: `https://creatorconnect.app/creator/events/${params.id}/manage` },
+    ],
   }),
   component: ManageEventPage,
 });

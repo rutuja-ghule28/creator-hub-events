@@ -16,8 +16,34 @@ import {
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/creator/$id")({
-  head: () => ({
-    meta: [{ title: "Creator Profile — CreatorConnect" }],
+  head: ({ params }) => ({
+    meta: [
+      { title: "Creator Profile & Events — CreatorConnect" },
+      {
+        name: "description",
+        content:
+          "Discover creator bio, upcoming official meetups, community events, and verified details.",
+      },
+      { property: "og:site_name", content: "CreatorConnect" },
+      { property: "og:title", content: "Creator Profile & Events — CreatorConnect" },
+      {
+        property: "og:description",
+        content:
+          "Discover creator bio, upcoming official meetups, community events, and verified details.",
+      },
+      { property: "og:type", content: "profile" },
+      { property: "og:url", content: `https://creatorconnect.app/creator/${params.id}` },
+      { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Creator Profile & Events — CreatorConnect" },
+      {
+        name: "twitter:description",
+        content:
+          "Discover creator bio, upcoming official meetups, community events, and verified details.",
+      },
+      { name: "twitter:image", content: "https://creatorconnect.app/assets/og-image.png" },
+    ],
+    links: [{ rel: "canonical", href: `https://creatorconnect.app/creator/${params.id}` }],
   }),
   component: CreatorProfilePage,
 });
