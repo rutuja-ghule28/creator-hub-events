@@ -166,12 +166,17 @@ function EventPage() {
   const existingApp = myApplicationQuery.data;
 
   const isOrganizer = !!(me?.creator?.id && e?.creator_id && me.creator.id === e.creator_id);
+  const isPast = e?.starts_at ? new Date(e.starts_at) < new Date() : false;
   const isDeadlinePassed = e?.application_deadline
     ? new Date(e.application_deadline) < new Date()
     : false;
 
   const handleRegisterSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
+    if (isPast) {
+      toast.error("Registration is closed because this event has concluded.");
+      return;
+    }
     if (!fullName.trim() || !email.trim() || !phone.trim()) {
       toast.error("Please fill in all required fields.");
       return;
@@ -311,7 +316,13 @@ function EventPage() {
                 className="absolute inset-0 h-full w-full object-cover"
               />
               <div className="absolute top-4 left-4 flex items-center gap-2">
-                {e.status === "live" && <OfficialSeal />}
+                {isPast ? (
+                  <span className="rounded-full bg-black/75 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white/95 border border-white/20">
+                    Concluded
+                  </span>
+                ) : (
+                  e.status === "live" && <OfficialSeal />
+                )}
                 <span className="rounded-full bg-card/90 backdrop-blur-sm px-3 py-1 text-xs font-semibold text-foreground">
                   {e.type}
                 </span>
@@ -365,12 +376,12 @@ function EventPage() {
 
                   <span
                     className={`self-start sm:self-auto text-xs font-bold px-3 py-1 rounded-full ${
-                      isDeadlinePassed
+                      isPast || isDeadlinePassed
                         ? "bg-destructive/10 text-destructive"
                         : "bg-trust-soft text-trust"
                     }`}
                   >
-                    {isDeadlinePassed ? "Applications Closed" : "Open for Pitches"}
+                    {isPast ? "Event Concluded" : isDeadlinePassed ? "Applications Closed" : "Open for Pitches"}
                   </span>
                 </div>
 
@@ -460,11 +471,11 @@ function EventPage() {
                       <Button
                         variant="brand"
                         onClick={() => setPitchDialogOpen(true)}
-                        disabled={isDeadlinePassed}
+                        disabled={isDeadlinePassed || isPast}
                         className="rounded-xl gap-2 text-xs font-semibold shadow-brand w-full sm:w-auto"
                       >
                         <Sparkles className="size-3.5" />
-                        {isDeadlinePassed ? "Deadline Passed" : "Apply to Campaign"}
+                        {isPast ? "Event Concluded" : isDeadlinePassed ? "Deadline Passed" : "Apply to Campaign"}
                       </Button>
                     </div>
                   ) : (
@@ -550,18 +561,41 @@ function EventPage() {
           <div className="lg:col-span-4">
             <div className="sticky top-24 space-y-6 rounded-3xl bg-card border border-border p-6 shadow-md">
               {/* Event Price & Seats */}
-              <div className="space-y-4">
-                <div className="flex items-baseline justify-between">
-                  <span className="font-display text-2xl font-bold text-foreground">
-                    Free Ticket
-                  </span>
-                  <span className="text-xs font-semibold text-trust bg-trust-soft px-2.5 py-1 rounded-full">
-                    Official Entry
-                  </span>
-                </div>
+              {isPast ? (
+                <div className="space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-display text-2xl font-bold text-muted-foreground">
+                      Concluded
+                    </span>
+                    <span className="text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full border border-border">
+                      Past Event
+                    </span>
+                  </div>
 
-                <SeatsBar taken={e.seats_taken} capacity={e.capacity} />
-              </div>
+                  <div className="rounded-2xl bg-muted/50 p-4 border border-border space-y-1.5">
+                    <p className="text-xs font-semibold text-foreground">Registration Closed</p>
+                    <p className="text-xs text-muted-foreground">
+                      This meetup concluded on {fmtDateTime(e.starts_at)}.
+                    </p>
+                    <p className="text-[11px] text-muted-foreground pt-1 border-t border-border/60">
+                      Registered Passes: {e.seats_taken} / Capacity: {e.capacity}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-display text-2xl font-bold text-foreground">
+                      Free Ticket
+                    </span>
+                    <span className="text-xs font-semibold text-trust bg-trust-soft px-2.5 py-1 rounded-full">
+                      Official Entry
+                    </span>
+                  </div>
+
+                  <SeatsBar taken={e.seats_taken} capacity={e.capacity} />
+                </div>
+              )}
 
               {/* Creator Card Row with Follow Button */}
               {e.creator && (
@@ -604,15 +638,26 @@ function EventPage() {
               )}
 
               {/* Action Button */}
-              <Button
-                variant="brand"
-                size="lg"
-                className="w-full text-base font-semibold h-12 rounded-2xl shadow-brand"
-                disabled={left === 0}
-                onClick={() => setRegisterOpen(true)}
-              >
-                {left === 0 ? "Sold out" : "Register now — Free"}
-              </Button>
+              {isPast ? (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full text-base font-semibold h-12 rounded-2xl cursor-not-allowed opacity-75"
+                  disabled
+                >
+                  Registration Closed — Concluded
+                </Button>
+              ) : (
+                <Button
+                  variant="brand"
+                  size="lg"
+                  className="w-full text-base font-semibold h-12 rounded-2xl shadow-brand"
+                  disabled={left === 0}
+                  onClick={() => setRegisterOpen(true)}
+                >
+                  {left === 0 ? "Sold out" : "Register now — Free"}
+                </Button>
+              )}
 
               <div className="space-y-2 text-xs text-muted-foreground">
                 <p className="flex items-center gap-2">
@@ -634,18 +679,20 @@ function EventPage() {
         <div className="md:hidden fixed bottom-16 inset-x-0 z-20 bg-card/95 border-t border-border p-4 backdrop-blur shadow-lg flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground">
-              {left === 0 ? "Sold out" : `${left} seats remaining`}
+              {isPast ? "Event concluded" : left === 0 ? "Sold out" : `${left} seats remaining`}
             </p>
-            <p className="font-display font-bold text-lg text-foreground">Free Entry</p>
+            <p className="font-display font-bold text-lg text-foreground">
+              {isPast ? "Concluded" : "Free Entry"}
+            </p>
           </div>
           <Button
-            variant="brand"
+            variant={isPast ? "outline" : "brand"}
             size="lg"
             className="rounded-2xl px-6"
-            disabled={left === 0}
-            onClick={() => setRegisterOpen(true)}
+            disabled={isPast || left === 0}
+            onClick={() => !isPast && setRegisterOpen(true)}
           >
-            {left === 0 ? "Sold out" : "Register"}
+            {isPast ? "Concluded" : left === 0 ? "Sold out" : "Register"}
           </Button>
         </div>
       )}

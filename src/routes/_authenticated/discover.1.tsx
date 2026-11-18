@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
@@ -11,9 +11,12 @@ import {
   ShieldCheck,
   BadgeCheck,
   CheckCircle2,
+  Clock,
+  PlusCircle,
+  CalendarDays,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { EVENT_SELECT, EVENT_TYPES, NICHES, errMsg, type Creator, type EventWithCreator } from "@/lib/cc";
+import { EVENT_SELECT, EVENT_TYPES, NICHES, errMsg, useMe, type Creator, type EventWithCreator } from "@/lib/cc";
 import {
   Chip,
   CreatorCard,
@@ -28,12 +31,14 @@ import { Input } from "@/components/ui/input";
 type DiscoverSearch = {
   tab?: "events" | "creators";
   q?: string;
+  scope?: "upcoming" | "past";
 };
 
 export const Route = createFileRoute("/_authenticated/discover/1")({
   validateSearch: (s: Record<string, unknown>): DiscoverSearch => ({
     tab: s["tab"] === "creators" ? "creators" : "events",
     q: typeof s["q"] === "string" ? s["q"] : undefined,
+    scope: s["scope"] === "past" ? "past" : "upcoming",
   }),
   head: () => ({
     meta: [
@@ -69,8 +74,14 @@ export const Route = createFileRoute("/_authenticated/discover/1")({
 
 function Discover() {
   const searchParams = Route.useSearch();
+  const { data: me } = useMe();
+  const isCreator = me?.roles?.includes("creator");
+
   const [activeTab, setActiveTab] = useState<"events" | "creators">(
     searchParams.tab === "creators" ? "creators" : "events",
+  );
+  const [eventScope, setEventScope] = useState<"upcoming" | "past">(
+    searchParams.scope === "past" ? "past" : "upcoming",
   );
 
   // Events Filter State
@@ -88,7 +99,7 @@ function Discover() {
   const [creatorVerifiedOnly, setCreatorVerifiedOnly] = useState(false);
   const [creatorSortBy, setCreatorSortBy] = useState<"followers" | "popular" | "name">("followers");
 
-  // Real Supabase Events Query
+  // Real Supabase Events Query - Only live events (pending remain protected by RLS and status check)
   const eventsQuery = useQuery({
     queryKey: ["events", "live"],
     queryFn: async () => {
@@ -96,12 +107,24 @@ function Discover() {
         .from("events")
         .select(EVENT_SELECT)
         .eq("status", "live")
-        .gte("starts_at", new Date().toISOString())
-        .order("starts_at");
+        .order("starts_at", { ascending: false });
       if (error) throw error;
-      return data as unknown as EventWithCreator[];
+      return (data ?? []) as unknown as EventWithCreator[];
     },
   });
+
+  const allEvents = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
+  const now = new Date();
+
+  const upcomingEvents = useMemo(
+    () => allEvents.filter((e) => new Date(e.starts_at) >= now),
+    [allEvents, now],
+  );
+
+  const pastEvents = useMemo(
+    () => allEvents.filter((e) => new Date(e.starts_at) < now),
+    [allEvents, now],
+  );
 
   // Real Supabase Creators Query
   const creatorsQuery = useQuery({
@@ -118,14 +141,18 @@ function Discover() {
 
   // Filtered Events
   const eventList = useMemo(() => {
-    const now = new Date();
-    let res = (eventsQuery.data ?? []).filter((e) => {
+    const pool = eventScope === "upcoming" ? upcomingEvents : pastEvents;
+    const nowTime = new Date();
+
+    let res = pool.filter((e) => {
       const d = new Date(e.starts_at);
-      const m = (d.getFullYear() - now.getFullYear()) * 12 + d.getMonth() - now.getMonth();
-      if (when === "this" && m !== 0) return false;
-      if (when === "next" && m !== 1) return false;
+      if (eventScope === "upcoming") {
+        const m = (d.getFullYear() - nowTime.getFullYear()) * 12 + d.getMonth() - nowTime.getMonth();
+        if (when === "this" && m !== 0) return false;
+        if (when === "next" && m !== 1) return false;
+        if (availOnly && e.seats_taken >= e.capacity) return false;
+      }
       if (type !== "All" && e.type !== type) return false;
-      if (availOnly && e.seats_taken >= e.capacity) return false;
       const s = q.trim().toLowerCase();
       return (
         !s ||
@@ -137,14 +164,19 @@ function Discover() {
 
     if (sortBy === "popular") {
       res = [...res].sort((a, b) => b.seats_taken - a.seats_taken);
-    } else {
+    } else if (eventScope === "upcoming") {
       res = [...res].sort(
         (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
+      );
+    } else {
+      // Past events: show most recent first
+      res = [...res].sort(
+        (a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime(),
       );
     }
 
     return res;
-  }, [eventsQuery.data, q, type, when, availOnly, sortBy]);
+  }, [eventScope, upcomingEvents, pastEvents, q, type, when, availOnly, sortBy]);
 
   // Filtered Creators
   const creatorList = useMemo(() => {
@@ -209,6 +241,7 @@ function Discover() {
     setWhen("any");
     setAvailOnly(false);
     setSortBy("soonest");
+    setEventScope("upcoming");
   };
 
   const clearCreatorFilters = () => {
@@ -272,7 +305,7 @@ function Discover() {
           }`}
         >
           <Sparkles className="size-4 text-primary" />
-          <span>Explore Events ({eventsQuery.data?.length ?? 0})</span>
+          <span>Explore Events ({allEvents.length})</span>
         </button>
 
         <button
@@ -468,25 +501,35 @@ function Discover() {
             {/* Mobile Filter Chips */}
             <div className="lg:hidden space-y-3">
               <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+                <Chip active={eventScope === "upcoming"} onClick={() => setEventScope("upcoming")}>
+                  Upcoming ({upcomingEvents.length})
+                </Chip>
+                <Chip active={eventScope === "past"} onClick={() => setEventScope("past")}>
+                  Past Events ({pastEvents.length})
+                </Chip>
+              </div>
+              <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
                 {["All", ...EVENT_TYPES].map((t) => (
                   <Chip key={t} active={type === t} onClick={() => setType(t)}>
                     {t}
                   </Chip>
                 ))}
               </div>
-              <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-                {(
-                  [
-                    ["any", "Any date"],
-                    ["this", "This month"],
-                    ["next", "Next month"],
-                  ] as const
-                ).map(([k, l]) => (
-                  <Chip key={k} active={when === k} onClick={() => setWhen(k)}>
-                    {l}
-                  </Chip>
-                ))}
-              </div>
+              {eventScope === "upcoming" && (
+                <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+                  {(
+                    [
+                      ["any", "Any date"],
+                      ["this", "This month"],
+                      ["next", "Next month"],
+                    ] as const
+                  ).map(([k, l]) => (
+                    <Chip key={k} active={when === k} onClick={() => setWhen(k)}>
+                      {l}
+                    </Chip>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Desktop Event Filter Panel */}
@@ -496,7 +539,7 @@ function Discover() {
                   <SlidersHorizontal className="size-4 text-primary" aria-hidden />
                   Event Filters
                 </h2>
-                {(type !== "All" || when !== "any" || availOnly || q) && (
+                {(type !== "All" || when !== "any" || availOnly || q || eventScope !== "upcoming") && (
                   <button
                     type="button"
                     onClick={clearEventFilters}
@@ -507,8 +550,39 @@ function Discover() {
                 )}
               </div>
 
-              {/* Event Type */}
+              {/* Status Switcher (Upcoming vs Past) */}
               <div className="space-y-3">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Status
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEventScope("upcoming")}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all text-center ${
+                      eventScope === "upcoming"
+                        ? "bg-foreground text-background shadow-xs"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Upcoming ({upcomingEvents.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEventScope("past")}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all text-center ${
+                      eventScope === "past"
+                        ? "bg-foreground text-background shadow-xs"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Past ({pastEvents.length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Event Type */}
+              <div className="space-y-3 pt-2 border-t border-border">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Category
                 </label>
@@ -530,34 +604,36 @@ function Discover() {
                 </div>
               </div>
 
-              {/* Date Range */}
-              <div className="space-y-3 pt-2 border-t border-border">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Date Range
-                </label>
-                <div className="space-y-1.5">
-                  {(
-                    [
-                      ["any", "Any time"],
-                      ["this", "This month"],
-                      ["next", "Next month"],
-                    ] as const
-                  ).map(([k, l]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setWhen(k)}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                        when === k
-                          ? "bg-primary/10 text-primary font-semibold"
-                          : "text-muted-foreground hover:bg-muted"
-                      }`}
-                    >
-                      {l}
-                    </button>
-                  ))}
+              {/* Date Range (Upcoming only) */}
+              {eventScope === "upcoming" && (
+                <div className="space-y-3 pt-2 border-t border-border">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Date Range
+                  </label>
+                  <div className="space-y-1.5">
+                    {(
+                      [
+                        ["any", "Any time"],
+                        ["this", "This month"],
+                        ["next", "Next month"],
+                      ] as const
+                    ).map(([k, l]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setWhen(k)}
+                        className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          when === k
+                            ? "bg-primary/10 text-primary font-semibold"
+                            : "text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Location Pill & Available Seats */}
               <div className="space-y-3 pt-2 border-t border-border">
@@ -568,15 +644,17 @@ function Discover() {
                   <MapPin className="size-4 text-primary" aria-hidden />
                   <span>Pune, MH</span>
                 </div>
-                <label className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-foreground cursor-pointer hover:bg-muted rounded-xl transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={availOnly}
-                    onChange={(e) => setAvailOnly(e.target.checked)}
-                    className="size-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <span>Seats available only</span>
-                </label>
+                {eventScope === "upcoming" && (
+                  <label className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-foreground cursor-pointer hover:bg-muted rounded-xl transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={availOnly}
+                      onChange={(e) => setAvailOnly(e.target.checked)}
+                      className="size-4 rounded border-border text-primary focus:ring-primary"
+                    />
+                    <span>Seats available only</span>
+                  </label>
+                )}
               </div>
             </div>
           </aside>
@@ -584,13 +662,40 @@ function Discover() {
           {/* Right Event Grid Area */}
           <section className="lg:col-span-3 space-y-6">
             {/* Header Controls: Count & Sort */}
-            <div className="flex items-center justify-between border-b border-border pb-4">
-              <p className="text-sm font-semibold text-muted-foreground">
-                Showing <span className="text-foreground">{eventList.length}</span>{" "}
-                {eventList.length === 1 ? "event" : "events"}
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:inline-flex rounded-xl bg-muted/70 p-1 border border-border">
+                  <button
+                    type="button"
+                    onClick={() => setEventScope("upcoming")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      eventScope === "upcoming"
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Upcoming ({upcomingEvents.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEventScope("past")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      eventScope === "past"
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Past Concluded ({pastEvents.length})
+                  </button>
+                </div>
 
-              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Showing <span className="text-foreground">{eventList.length}</span>{" "}
+                  {eventList.length === 1 ? "event" : "events"}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <ArrowUpDown className="size-4 text-muted-foreground" aria-hidden />
                 <label htmlFor="sort-dropdown" className="sr-only">
                   Sort events
@@ -601,8 +706,10 @@ function Discover() {
                   onChange={(e) => setSortBy(e.target.value as "soonest" | "popular")}
                   className="bg-card border border-border rounded-xl px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="soonest">Soonest first</option>
-                  <option value="popular">Most popular</option>
+                  <option value="soonest">
+                    {eventScope === "upcoming" ? "Soonest first" : "Most recent first"}
+                  </option>
+                  <option value="popular">Most booked</option>
                 </select>
               </div>
             </div>
@@ -612,16 +719,87 @@ function Discover() {
               <ListSkeleton tall rows={3} />
             ) : eventsQuery.error ? (
               <ErrorState message={errMsg(eventsQuery.error)} onRetry={() => eventsQuery.refetch()} />
+            ) : eventScope === "upcoming" && upcomingEvents.length === 0 ? (
+              <div className="rounded-3xl bg-card border border-border p-8 md:p-12 text-center shadow-xs space-y-6">
+                <div className="mx-auto size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs">
+                  <CalendarDays className="size-7" />
+                </div>
+                <div className="max-w-md mx-auto space-y-2">
+                  <h3 className="font-display text-xl sm:text-2xl font-bold text-foreground">
+                    No upcoming meetups scheduled right now
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Creators in Pune announce official meetups, workshops, and exclusive launches on a rolling basis. Follow creators in the directory to receive notifications when new tickets drop.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  <Button
+                    variant="brand"
+                    onClick={() => setActiveTab("creators")}
+                    className="gap-2 rounded-2xl font-semibold shadow-brand px-5"
+                  >
+                    <Users className="size-4" /> Explore Creator Directory
+                  </Button>
+
+                  {pastEvents.length > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setEventScope("past")}
+                      className="gap-2 rounded-2xl font-semibold px-5"
+                    >
+                      <Clock className="size-4 text-muted-foreground" /> Browse Past Events ({pastEvents.length})
+                    </Button>
+                  )}
+
+                  {isCreator ? (
+                    <Link to="/creator/events/create">
+                      <Button variant="outline" className="gap-2 rounded-2xl font-semibold px-5">
+                        <PlusCircle className="size-4 text-primary" /> Host an Event
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link to="/profile">
+                      <Button
+                        variant="ghost"
+                        className="gap-2 rounded-2xl text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        <Sparkles className="size-3.5 text-primary" /> Apply to become a creator
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
             ) : eventList.length === 0 ? (
               <EmptyState
-                title="No events match your criteria"
-                body="Try changing your filters or searching for a different creator or venue."
+                title={
+                  eventScope === "upcoming"
+                    ? "No upcoming events match your filters"
+                    : "No past events match your filters"
+                }
+                body="Try adjusting your search query, location, or selecting another category."
                 action={
                   <Button variant="brand" onClick={clearEventFilters}>
                     Reset filters
                   </Button>
                 }
               />
+            ) : eventScope === "past" ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-bold font-display tracking-tight text-foreground flex items-center gap-2">
+                    <Clock className="size-4 text-primary" /> Concluded Events & Meetups
+                  </h2>
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Archive of previously concluded official gatherings
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                  {eventList.map((e) => (
+                    <EventCardLarge key={e.id} e={e} />
+                  ))}
+                </div>
+              </div>
             ) : (
               <div className="space-y-8">
                 {/* Happening Soon Section */}

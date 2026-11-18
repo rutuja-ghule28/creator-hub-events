@@ -193,15 +193,25 @@ export function Avatar({
 
 /* ---------- Event cards ---------- */
 export function EventCardLarge({ e }: { e: EventWithCreator }) {
+  const isPast = new Date(e.starts_at) < new Date();
   return (
     <Link
       to="/events/$id"
       params={{ id: e.id }}
-      className="block w-[78%] shrink-0 snap-start overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-border"
+      className={cn(
+        "block w-[78%] shrink-0 snap-start overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-border transition-all hover:ring-primary/40",
+        isPast && "opacity-95"
+      )}
     >
       <div className="relative aspect-[5/3]">
         <EventCover id={e.id} src={e.cover_url} alt="" className="absolute inset-0 h-full w-full" />
-        {e.status === "live" && <OfficialSeal small className="absolute left-3 top-3" />}
+        {isPast ? (
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/75 backdrop-blur-md px-2.5 py-1 text-xs font-semibold text-white/95 border border-white/20">
+            Concluded
+          </span>
+        ) : (
+          e.status === "live" && <OfficialSeal small className="absolute left-3 top-3" />
+        )}
         <span className="absolute bottom-3 left-3 rounded-full bg-card/90 px-2.5 py-1 text-xs font-semibold text-foreground">
           {e.type}
         </span>
@@ -215,6 +225,19 @@ export function EventCardLarge({ e }: { e: EventWithCreator }) {
           <CalendarDays className="size-4 text-primary" aria-hidden />
           {fmtDateTime(e.starts_at)}
         </p>
+        {isPast ? (
+          <p className="text-xs text-muted-foreground pt-1 flex items-center justify-between">
+            <span className="font-semibold text-muted-foreground">Concluded</span>
+            <span>Registered passes: {e.seats_taken}/{e.capacity}</span>
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground pt-1 flex items-center justify-between">
+            <span className={cn("font-medium", seatsLeft(e) <= 20 ? "text-warn-foreground" : "")}>
+              {seatsLeft(e) === 0 ? "Sold out" : `${seatsLeft(e)} seats left`}
+            </span>
+            <span>{e.seats_taken}/{e.capacity} registered</span>
+          </p>
+        )}
       </div>
     </Link>
   );
@@ -222,6 +245,7 @@ export function EventCardLarge({ e }: { e: EventWithCreator }) {
 
 export function EventRowCompact({ e, right }: { e: EventWithCreator; right?: ReactNode }) {
   const left = seatsLeft(e);
+  const isPast = new Date(e.starts_at) < new Date();
   return (
     <Link
       to="/events/$id"
@@ -234,9 +258,13 @@ export function EventRowCompact({ e, right }: { e: EventWithCreator; right?: Rea
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
           {e.type}
-          {e.status === "live" && (
+          {isPast ? (
+            <span className="text-[10px] text-muted-foreground font-semibold px-1.5 py-0.5 bg-muted rounded border border-border">
+              Concluded
+            </span>
+          ) : e.status === "live" ? (
             <ShieldCheck className="size-3.5 text-trust" aria-label="Official event" />
-          )}
+          ) : null}
         </div>
         <h3 className="line-clamp-1 font-semibold">{e.title}</h3>
         <p className="line-clamp-1 text-xs text-muted-foreground">
@@ -245,8 +273,8 @@ export function EventRowCompact({ e, right }: { e: EventWithCreator; right?: Rea
         <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
           <MapPin className="size-3" aria-hidden />
           {e.area}
-          <span className={cn("ml-auto font-medium", left <= 20 ? "text-warn-foreground" : "")}>
-            {left === 0 ? "Sold out" : `${left} left`}
+          <span className={cn("ml-auto font-medium", !isPast && left <= 20 ? "text-warn-foreground" : "")}>
+            {isPast ? "Concluded" : left === 0 ? "Sold out" : `${left} left`}
           </span>
         </p>
       </div>
