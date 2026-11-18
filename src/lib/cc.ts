@@ -3,8 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
 export type Creator = Tables<"creators">;
+export type Organizer = Tables<"organizers">;
+export type OrganizerPrivateDetails = Tables<"organizer_private_details">;
 export type EventRow = Tables<"events">;
-export type EventWithCreator = EventRow & { creator: Creator | null };
+export type EventWithCreator = EventRow & { creator: Creator | null; organizer?: Organizer | null };
 export type Registration = Tables<"registrations">;
 export type Notification = Tables<"notifications">;
 
@@ -66,13 +68,58 @@ export const VERIFIABLE_FIELDS = [
   },
 ] as const;
 
+export type AccountType = "attendee" | "creator" | "organizer";
+
 export type Me = {
   id: string;
   email: string;
-  profile: Tables<"profiles"> | null;
+  profile: (Tables<"profiles"> & { account_type?: string }) | null;
   roles: string[];
   creator: Creator | null;
+  organizer: (Organizer & { private_details?: OrganizerPrivateDetails | null }) | null;
 };
+
+export function resolvePostAuthRedirect({
+  accountType,
+  roles = [],
+  creatorStatus,
+  explicitRedirect,
+}: {
+  accountType?: string | null | undefined;
+  roles?: string[] | undefined;
+  creatorStatus?: { verified: boolean; verification_status: string } | null | undefined;
+  explicitRedirect?: string | null | undefined;
+}): string {
+  if (
+    explicitRedirect &&
+    explicitRedirect.startsWith("/") &&
+    !explicitRedirect.startsWith("//") &&
+    !explicitRedirect.startsWith("/auth") &&
+    explicitRedirect !== "/discover" &&
+    explicitRedirect !== "/discover/1" &&
+    explicitRedirect !== "/"
+  ) {
+    return explicitRedirect;
+  }
+
+  if (roles.includes("admin")) {
+    return "/admin/verify";
+  }
+
+  const normalizedAccount = accountType?.toLowerCase();
+  if (normalizedAccount === "organizer" || roles.includes("organizer")) {
+    return "/creator/events";
+  }
+
+  if (normalizedAccount === "creator" || roles.includes("creator")) {
+    if (creatorStatus?.verified || creatorStatus?.verification_status === "verified") {
+      return "/creator/dashboard";
+    }
+    return "/profile";
+  }
+
+  return "/discover/1";
+}
 
 export const meQuery = queryOptions({
   queryKey: ["me"],
@@ -81,10 +128,15 @@ export const meQuery = queryOptions({
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return null;
-    const [p, r, c] = await Promise.all([
+    const [p, r, c, o] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", user.id),
       supabase.from("creators").select("*").eq("user_id", user.id).maybeSingle(),
+      supabase
+        .from("organizers")
+        .select("*, private_details:organizer_private_details(*)")
+        .eq("user_id", user.id)
+        .maybeSingle(),
     ]);
     return {
       id: user.id,
@@ -92,6 +144,7 @@ export const meQuery = queryOptions({
       profile: p.data,
       roles: (r.data ?? []).map((x) => x.role),
       creator: c.data,
+      organizer: o.data,
     };
   },
   staleTime: 30_000,
@@ -140,4 +193,4 @@ export function errMsg(e: unknown) {
     return String((e as { message: string }).message);
   return "Something went wrong. Please try again.";
 }
-export const EVENT_SELECT = "*, creator:creators(*)";
+export const EVENT_SELECT = "*, creator:creators(*), organizer:organizers(*)";

@@ -138,7 +138,7 @@ function TicketsPage() {
             title="No tickets yet"
             body="Discover events near you and register to get your official QR ticket pass."
             action={
-              <Link to="/discover">
+              <Link to="/discover/1">
                 <Button variant="brand">Browse events</Button>
               </Link>
             }
@@ -211,7 +211,7 @@ function TicketsPage() {
           title="No saved events"
           body="Bookmark creator events while exploring to save them for later."
           action={
-            <Link to="/discover">
+            <Link to="/discover/1">
               <Button variant="brand">Explore events</Button>
             </Link>
           }

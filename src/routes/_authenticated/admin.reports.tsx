@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Flag, Trash2, CheckCircle, Clock } from "lucide-react";
+import { Flag, Trash2, CheckCircle, Clock, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { errMsg, fmtAgo, fmtDateTime, type EventWithCreator } from "@/lib/cc";
+import { errMsg, fmtAgo, fmtDateTime, useMe, type EventWithCreator } from "@/lib/cc";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/cc";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,6 +56,7 @@ type ReportRow = {
 
 function AdminReportsPage() {
   const qc = useQueryClient();
+  const { data: me, isLoading: meLoading } = useMe();
   const [selectedReport, setSelectedReport] = useState<ReportRow | null>(null);
 
   const reportsQuery = useQuery({
@@ -100,6 +101,30 @@ function AdminReportsPage() {
       toast.error(errMsg(err));
     }
   };
+
+  if (meLoading) {
+    return <ListSkeleton />;
+  }
+
+  if (!me?.roles?.includes("admin")) {
+    return (
+      <main className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="size-16 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center">
+          <ShieldAlert className="size-8" />
+        </div>
+        <h1 className="font-display text-2xl font-bold">Admin Authorization Required</h1>
+        <p className="text-sm text-muted-foreground max-w-md">
+          This portal is reserved exclusively for Creator Connect platform administrators. Your
+          current account does not hold admin permissions.
+        </p>
+        <Link to="/discover/1">
+          <Button variant="brand" className="rounded-xl">
+            Return to Discover
+          </Button>
+        </Link>
+      </main>
+    );
+  }
 
   return (
     <main className="px-4 py-5 md:px-6 md:py-8 pb-24 space-y-6">

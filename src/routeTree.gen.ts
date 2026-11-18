@@ -23,6 +23,7 @@ import { Route as AuthenticatedAdminVerifyRouteImport } from './routes/_authenti
 import { Route as AuthenticatedCreatorIdRouteImport } from './routes/_authenticated/creator.$id'
 import { Route as AuthenticatedCreatorDashboardRouteImport } from './routes/_authenticated/creator.dashboard'
 import { Route as AuthenticatedCreatorEventsRouteImport } from './routes/_authenticated/creator.events'
+import { Route as AuthenticatedDiscover1RouteImport } from './routes/_authenticated/discover.1'
 import { Route as AuthenticatedEventsIdRouteImport } from './routes/_authenticated/events/$id'
 import { Route as AuthenticatedTicketsIdRouteImport } from './routes/_authenticated/tickets.$id'
 import { Route as AuthenticatedCreatorEventsCreateRouteImport } from './routes/_authenticated/creator.events.create'
@@ -103,6 +104,11 @@ const AuthenticatedCreatorEventsRoute =
     path: '/creator/events',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDiscover1Route = AuthenticatedDiscover1RouteImport.update({
+  id: '/1',
+  path: '/1',
+  getParentRoute: () => AuthenticatedDiscoverRoute,
+} as any)
 const AuthenticatedEventsIdRoute = AuthenticatedEventsIdRouteImport.update({
   id: '/events/$id',
   path: '/events/$id',
@@ -129,7 +135,7 @@ const AuthenticatedCreatorEventsIdManageRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/discover': typeof AuthenticatedDiscoverRoute
+  '/discover': typeof AuthenticatedDiscoverRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/saved': typeof AuthenticatedSavedRoute
@@ -140,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/creator/$id': typeof AuthenticatedCreatorIdRoute
   '/creator/dashboard': typeof AuthenticatedCreatorDashboardRoute
   '/creator/events': typeof AuthenticatedCreatorEventsRouteWithChildren
+  '/discover/1': typeof AuthenticatedDiscover1Route
   '/events/$id': typeof AuthenticatedEventsIdRoute
   '/tickets/$id': typeof AuthenticatedTicketsIdRoute
   '/creator/events/create': typeof AuthenticatedCreatorEventsCreateRoute
@@ -148,7 +155,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/discover': typeof AuthenticatedDiscoverRoute
+  '/discover': typeof AuthenticatedDiscoverRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/saved': typeof AuthenticatedSavedRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/creator/$id': typeof AuthenticatedCreatorIdRoute
   '/creator/dashboard': typeof AuthenticatedCreatorDashboardRoute
   '/creator/events': typeof AuthenticatedCreatorEventsRouteWithChildren
+  '/discover/1': typeof AuthenticatedDiscover1Route
   '/events/$id': typeof AuthenticatedEventsIdRoute
   '/tickets/$id': typeof AuthenticatedTicketsIdRoute
   '/creator/events/create': typeof AuthenticatedCreatorEventsCreateRoute
@@ -169,7 +177,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/_authenticated/discover': typeof AuthenticatedDiscoverRoute
+  '/_authenticated/discover': typeof AuthenticatedDiscoverRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/saved': typeof AuthenticatedSavedRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/_authenticated/creator/$id': typeof AuthenticatedCreatorIdRoute
   '/_authenticated/creator/dashboard': typeof AuthenticatedCreatorDashboardRoute
   '/_authenticated/creator/events': typeof AuthenticatedCreatorEventsRouteWithChildren
+  '/_authenticated/discover/1': typeof AuthenticatedDiscover1Route
   '/_authenticated/events/$id': typeof AuthenticatedEventsIdRoute
   '/_authenticated/tickets/$id': typeof AuthenticatedTicketsIdRoute
   '/_authenticated/creator/events/create': typeof AuthenticatedCreatorEventsCreateRoute
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/creator/$id'
     | '/creator/dashboard'
     | '/creator/events'
+    | '/discover/1'
     | '/events/$id'
     | '/tickets/$id'
     | '/creator/events/create'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/creator/$id'
     | '/creator/dashboard'
     | '/creator/events'
+    | '/discover/1'
     | '/events/$id'
     | '/tickets/$id'
     | '/creator/events/create'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/_authenticated/creator/$id'
     | '/_authenticated/creator/dashboard'
     | '/_authenticated/creator/events'
+    | '/_authenticated/discover/1'
     | '/_authenticated/events/$id'
     | '/_authenticated/tickets/$id'
     | '/_authenticated/creator/events/create'
@@ -352,6 +364,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCreatorEventsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/discover/1': {
+      id: '/_authenticated/discover/1'
+      path: '/1'
+      fullPath: '/discover/1'
+      preLoaderRoute: typeof AuthenticatedDiscover1RouteImport
+      parentRoute: typeof AuthenticatedDiscoverRoute
+    }
     '/_authenticated/events/$id': {
       id: '/_authenticated/events/$id'
       path: '/events/$id'
@@ -383,6 +402,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedDiscoverRouteChildren {
+  AuthenticatedDiscover1Route: typeof AuthenticatedDiscover1Route
+}
+
+const AuthenticatedDiscoverRouteChildren: AuthenticatedDiscoverRouteChildren = {
+  AuthenticatedDiscover1Route: AuthenticatedDiscover1Route,
+}
+
+const AuthenticatedDiscoverRouteWithChildren =
+  AuthenticatedDiscoverRoute._addFileChildren(
+    AuthenticatedDiscoverRouteChildren,
+  )
+
 interface AuthenticatedTicketsRouteChildren {
   AuthenticatedTicketsIdRoute: typeof AuthenticatedTicketsIdRoute
 }
@@ -413,7 +445,7 @@ const AuthenticatedCreatorEventsRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedDiscoverRoute: typeof AuthenticatedDiscoverRoute
+  AuthenticatedDiscoverRoute: typeof AuthenticatedDiscoverRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedSavedRoute: typeof AuthenticatedSavedRoute
@@ -428,7 +460,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedDiscoverRoute: AuthenticatedDiscoverRoute,
+  AuthenticatedDiscoverRoute: AuthenticatedDiscoverRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedSavedRoute: AuthenticatedSavedRoute,

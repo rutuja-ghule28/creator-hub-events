@@ -1,16 +1,41 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import {
+  Mail,
+  CheckCircle2,
+  ArrowLeft,
+  RefreshCw,
+  Compass,
+  Sparkles,
+  CalendarDays,
+  Check,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { errMsg, resolvePostAuthRedirect, type AccountType } from "@/lib/cc";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Search = { redirect?: string | undefined };
+type Search = {
+  redirect?: string | undefined;
+  error?: string | undefined;
+  error_code?: string | undefined;
+  error_description?: string | undefined;
+  confirmed?: string | undefined;
+  role?: string | undefined;
+};
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>): Search => ({
     redirect: typeof s["redirect"] === "string" ? s["redirect"] : undefined,
+    error: typeof s["error"] === "string" ? s["error"] : undefined,
+    error_code: typeof s["error_code"] === "string" ? s["error_code"] : undefined,
+    error_description:
+      typeof s["error_description"] === "string" ? s["error_description"] : undefined,
+    confirmed: typeof s["confirmed"] === "string" ? s["confirmed"] : undefined,
+    role: typeof s["role"] === "string" ? s["role"] : undefined,
   }),
   head: () => ({
     meta: [
@@ -46,36 +71,282 @@ export const Route = createFileRoute("/auth")({
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
+export type AccountRole = "attendee" | "creator" | "organizer";
+
+export const ROLE_OPTIONS = [
+  {
+    id: "attendee" as const,
+    title: "Attendee",
+    tagline: "Discover & Participate",
+    icon: Compass,
+    iconColor: "text-emerald-500",
+    iconBg: "bg-emerald-500/10",
+    description: "Discover curated events, book official passes, and join creator communities.",
+    features: [
+      "Discover events.",
+      "Register for events.",
+      "Participate in events.",
+      "Access attendee dashboard.",
+    ],
+  },
+  {
+    id: "creator" as const,
+    title: "Creator",
+    tagline: "Showcase & Collaborate",
+    icon: Sparkles,
+    iconColor: "text-primary",
+    iconBg: "bg-primary/10",
+    description:
+      "Build your creator presence, showcase portfolio work, and connect with event organizers.",
+    features: [
+      "Create a creator profile.",
+      "Showcase portfolio and work.",
+      "Connect with event organizers.",
+      "Submit creator verification/application.",
+      "Access creator dashboard after the required verification.",
+    ],
+  },
+  {
+    id: "organizer" as const,
+    title: "Host / Organizer",
+    tagline: "Host & Manage",
+    icon: CalendarDays,
+    iconColor: "text-amber-500",
+    iconBg: "bg-amber-500/10",
+    description:
+      "Create official event listings, track ticket registrations, and manage attendees.",
+    features: [
+      "Create and manage events.",
+      "Manage event registrations.",
+      "View event-related information.",
+      "Access organizer dashboard.",
+      "Follow the existing event approval and publishing workflow.",
+    ],
+  },
+] as const;
+
 function AuthPage() {
   const nav = useNavigate();
-  const { redirect } = Route.useSearch();
+  const search = Route.useSearch();
+  const redirect = search.redirect;
   const [mode, setMode] = useState<"in" | "up">("in");
+  const [selectedRole, setSelectedRole] = useState<AccountRole | null>(() => {
+    if (search.role === "attendee" || search.role === "creator" || search.role === "organizer") {
+      return search.role;
+    }
+    return null;
+  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUnconfirmed, setIsUnconfirmed] = useState(false);
   const [sent, setSent] = useState(false);
+  const [confirmedSuccess, setConfirmedSuccess] = useState(false);
 
   const target =
     redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/discover";
 
+  // Check URL query parameters and hash fragments for email confirmation redirects & errors
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const hash = window.location.hash ? window.location.hash.slice(1) : "";
+    const hashParams = new URLSearchParams(hash);
+
+    // Check for auth error params from confirmation redirects
+    const err = searchParams.get("error") || hashParams.get("error");
+    const errCode = searchParams.get("error_code") || hashParams.get("error_code");
+    const errDesc = searchParams.get("error_description") || hashParams.get("error_description");
+
+    if (err || errCode || errDesc) {
+      if (errCode === "otp_expired" || errDesc?.toLowerCase().includes("expired")) {
+        setError(
+          "This email verification link has expired. Please sign in below or request a new confirmation email.",
+        );
+        toast.error("Verification link has expired.");
+      } else {
+        const decoded = errDesc
+          ? decodeURIComponent(errDesc.replace(/\+/g, " "))
+          : "Invalid or expired confirmation link.";
+        setError(decoded);
+        toast.error(decoded);
+      }
+      setMode("in");
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      return;
+    }
+
+    // Check if user arrived via confirmation redirect
+    if (
+      search.confirmed === "true" ||
+      hashParams.get("type") === "signup" ||
+      hashParams.get("access_token")
+    ) {
+      setConfirmedSuccess(true);
+    }
+
+    // Listen for auth state changes (e.g. token exchanged from email verification)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        toast.success("Email verified successfully! Welcome to CreatorConnect.");
+        let destination = target;
+        try {
+          const [pRes, rRes, cRes] = await Promise.all([
+            supabase
+              .from("profiles")
+              .select("account_type")
+              .eq("id", session.user.id)
+              .maybeSingle(),
+            supabase.from("user_roles").select("role").eq("user_id", session.user.id),
+            supabase
+              .from("creators")
+              .select("verified, verification_status")
+              .eq("user_id", session.user.id)
+              .maybeSingle(),
+          ]);
+          destination = resolvePostAuthRedirect({
+            accountType: pRes.data?.account_type,
+            roles: (rRes.data ?? []).map((x) => x.role),
+            creatorStatus: cRes.data,
+            explicitRedirect: redirect,
+          });
+        } catch {
+          destination = target;
+        }
+        nav({ to: destination });
+      }
+    });
+
+    // If active session exists, navigate to role-based destination
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        let destination = target;
+        try {
+          const [pRes, rRes, cRes] = await Promise.all([
+            supabase
+              .from("profiles")
+              .select("account_type")
+              .eq("id", session.user.id)
+              .maybeSingle(),
+            supabase.from("user_roles").select("role").eq("user_id", session.user.id),
+            supabase
+              .from("creators")
+              .select("verified, verification_status")
+              .eq("user_id", session.user.id)
+              .maybeSingle(),
+          ]);
+          destination = resolvePostAuthRedirect({
+            accountType: pRes.data?.account_type,
+            roles: (rRes.data ?? []).map((x) => x.role),
+            creatorStatus: cRes.data,
+            explicitRedirect: redirect,
+          });
+        } catch {
+          destination = target;
+        }
+        nav({ to: destination });
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [nav, target, search.confirmed, redirect]);
+
+  async function handleResendVerification() {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+      toast.error("Please enter a valid email address to resend confirmation.");
+      return;
+    }
+    setResending(true);
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const redirectUrl = origin
+        ? `${origin}/auth?redirect=${encodeURIComponent(target)}&confirmed=true`
+        : undefined;
+
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup",
+        email: cleanEmail,
+        ...(redirectUrl ? { options: { emailRedirectTo: redirectUrl } } : {}),
+      });
+
+      if (resendError) {
+        toast.error(resendError.message);
+      } else {
+        toast.success("Verification email resent! Please check your inbox.");
+      }
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setResending(false);
+    }
+  }
+
   async function signIn(e: string, p: string) {
     setBusy(true);
     setError(null);
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    setIsUnconfirmed(false);
+    const { data: signInData, error: authError } = await supabase.auth.signInWithPassword({
       email: e.trim(),
       password: p,
     });
     setBusy(false);
     if (authError) {
+      if (authError.message?.toLowerCase().includes("email not confirmed")) {
+        setIsUnconfirmed(true);
+        return setError(
+          "Please confirm your email before signing in. Check your inbox for the verification link.",
+        );
+      }
       return setError("Invalid email or password. Please check your credentials and try again.");
     }
-    nav({ to: target });
+    toast.success("Signed in successfully!");
+
+    let destination = target;
+    try {
+      const userId = signInData.user?.id;
+      if (userId) {
+        const [pRes, rRes, cRes] = await Promise.all([
+          supabase.from("profiles").select("account_type").eq("id", userId).maybeSingle(),
+          supabase.from("user_roles").select("role").eq("user_id", userId),
+          supabase
+            .from("creators")
+            .select("verified, verification_status")
+            .eq("user_id", userId)
+            .maybeSingle(),
+        ]);
+        destination = resolvePostAuthRedirect({
+          accountType: pRes.data?.account_type,
+          roles: (rRes.data ?? []).map((x) => x.role),
+          creatorStatus: cRes.data,
+          explicitRedirect: redirect,
+        });
+      }
+    } catch {
+      destination = target;
+    }
+
+    nav({ to: destination });
   }
 
   async function submit(ev: React.FormEvent) {
     ev.preventDefault();
     const cleanEmail = email.trim();
+
+    if (mode === "up") {
+      if (!selectedRole) {
+        return setError(
+          "Please select how you want to use Creator Connect (Attendee, Creator, or Host / Organizer).",
+        );
+      }
+    }
 
     if (!cleanEmail) {
       return setError("Email address is required.");
@@ -94,19 +365,42 @@ function AuthPage() {
       return signIn(cleanEmail, password);
     }
 
-    // Sign up mode: strictly email + password
+    // Sign up mode
     setBusy(true);
     setError(null);
+    setIsUnconfirmed(false);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const { error: signUpError } = await supabase.auth.signUp({
+    const redirectUrl = origin
+      ? `${origin}/auth?redirect=${encodeURIComponent(target)}&confirmed=true`
+      : undefined;
+
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
-      ...(origin ? { options: { emailRedirectTo: origin } } : {}),
+      options: {
+        ...(redirectUrl ? { emailRedirectTo: redirectUrl } : {}),
+        data: {
+          account_type: selectedRole,
+          role: selectedRole,
+        },
+      },
     });
     setBusy(false);
 
     if (signUpError) {
       return setError(signUpError.message);
+    }
+
+    // If auto-confirm is enabled or session exists immediately
+    if (signUpData?.session) {
+      toast.success("Account created successfully!");
+      const destination = resolvePostAuthRedirect({
+        accountType: selectedRole,
+        roles: [selectedRole!, "attendee"],
+        explicitRedirect: redirect,
+      });
+      nav({ to: destination });
+      return;
     }
 
     setSent(true);
@@ -115,9 +409,14 @@ function AuthPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      {/* Semantic Header with New Official Logo */}
+      {/* Semantic Header with Official Logo */}
       <header className="border-b border-border/50 px-6 py-4">
-        <div className="mx-auto flex max-w-md items-center justify-between">
+        <div
+          className={cn(
+            "mx-auto flex items-center justify-between transition-all duration-300",
+            mode === "up" && !sent ? "max-w-3xl" : "max-w-md",
+          )}
+        >
           <Link
             to="/discover"
             className="flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
@@ -144,43 +443,175 @@ function AuthPage() {
 
       {/* Main Content Area */}
       <main className="flex flex-1 items-center justify-center px-5 py-12">
-        <div className="w-full max-w-md">
-          <div className="mb-8 text-center sm:text-left">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+        <div
+          className={cn(
+            "w-full transition-all duration-300",
+            mode === "up" && !sent ? "max-w-3xl" : "max-w-md",
+          )}
+        >
+          <div className="mb-6 text-center sm:text-left">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground font-display">
               {mode === "in" ? "Welcome back" : "Create your account"}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {mode === "in"
                 ? "Sign in with your email and password to access your event passes."
-                : "Join CreatorConnect to register for verified creator meetups and launches."}
+                : "Join CreatorConnect to register for verified events, showcase creator work, or host meetups."}
             </p>
           </div>
 
           {sent ? (
-            <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-              <div className="mb-3 inline-flex size-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
-                ✓
+            <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+              <div className="mb-4 inline-flex size-12 items-center justify-center rounded-2xl bg-brand/10 text-primary">
+                <Mail className="size-6 text-primary" />
               </div>
-              <h2 className="text-lg font-semibold text-foreground">Check your inbox</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                We sent a verification link to <strong className="text-foreground">{email}</strong>.
-                Open it to finish creating your account.
+              <h2 className="text-xl font-bold tracking-tight text-foreground">
+                Verify your email address
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                We sent an official confirmation link to{" "}
+                <strong className="text-foreground font-semibold">{email}</strong>. Please check
+                your inbox (and spam folder) and click the link to activate your CreatorConnect
+                account.
               </p>
-              <Button
-                variant="outline"
-                className="mt-6 w-full rounded-xl"
-                onClick={() => {
-                  setSent(false);
-                  setMode("in");
-                  setPassword("");
-                }}
-              >
-                Back to Sign in
-              </Button>
+
+              <div className="mt-6 rounded-2xl bg-muted/50 p-4 border border-border/60 text-xs text-muted-foreground space-y-1">
+                <p className="font-semibold text-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="size-3.5 text-emerald-500" /> What to expect:
+                </p>
+                <p>• Clicking the link will verify your email and redirect you to the portal.</p>
+                <p>
+                  • If you don't see the email within a few minutes, check your spam or junk folder.
+                </p>
+              </div>
+
+              <div className="mt-6 flex flex-col gap-2.5">
+                <Button
+                  variant="outline"
+                  className="w-full h-11 rounded-xl font-medium"
+                  disabled={resending}
+                  onClick={handleResendVerification}
+                >
+                  <RefreshCw className={cn("size-4 mr-2", resending && "animate-spin")} />
+                  {resending ? "Resending..." : "Resend verification email"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full h-11 rounded-xl text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setSent(false);
+                    setMode("in");
+                    setPassword("");
+                    setError(null);
+                  }}
+                >
+                  <ArrowLeft className="size-4 mr-2" />
+                  Back to Sign in
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm">
-              <form onSubmit={submit} className="space-y-4" noValidate autoComplete="off">
+              {confirmedSuccess && (
+                <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3.5 text-sm font-medium text-emerald-600 flex items-center gap-2">
+                  <CheckCircle2 className="size-5 shrink-0" />
+                  <span>Email verified successfully! Please sign in with your password.</span>
+                </div>
+              )}
+
+              <form onSubmit={submit} className="space-y-5" noValidate autoComplete="off">
+                {/* Mandatory Role Selection Section in Signup Mode */}
+                {mode === "up" && (
+                  <div className="space-y-3 pb-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-bold text-foreground">
+                        How do you want to use Creator Connect?{" "}
+                        <span className="text-destructive">*</span>
+                      </Label>
+                      <span className="text-xs font-semibold text-primary">
+                        Mandatory Selection
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground -mt-1">
+                      Choose your primary account type. You can attend events, showcase your creator
+                      portfolio, or host and manage official events.
+                    </p>
+
+                    <div
+                      role="radiogroup"
+                      aria-label="How do you want to use Creator Connect?"
+                      className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1"
+                    >
+                      {ROLE_OPTIONS.map((opt) => {
+                        const isSelected = selectedRole === opt.id;
+                        const Icon = opt.icon;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            onClick={() => {
+                              setSelectedRole(opt.id);
+                              if (error?.includes("select how you want to use")) {
+                                setError(null);
+                              }
+                            }}
+                            className={cn(
+                              "relative flex flex-col justify-between text-left p-4 rounded-2xl border transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                              isSelected
+                                ? "border-primary ring-2 ring-primary/80 bg-primary/5 dark:bg-primary/10 shadow-sm"
+                                : "border-border bg-card/60 hover:border-primary/40 hover:bg-muted/40",
+                            )}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-2.5">
+                                <span
+                                  className={cn(
+                                    "size-9 rounded-xl flex items-center justify-center shrink-0",
+                                    opt.iconBg,
+                                    opt.iconColor,
+                                  )}
+                                >
+                                  <Icon className="size-5" />
+                                </span>
+                                <span
+                                  className={cn(
+                                    "size-5 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors",
+                                    isSelected
+                                      ? "bg-primary text-primary-foreground border-primary"
+                                      : "border-border text-transparent",
+                                  )}
+                                >
+                                  {isSelected && <Check className="size-3 stroke-[3]" />}
+                                </span>
+                              </div>
+                              <h3 className="font-display font-bold text-base text-foreground">
+                                {opt.title}
+                              </h3>
+                              <span className="inline-block text-[10px] font-semibold text-primary mb-1">
+                                {opt.tagline}
+                              </span>
+                              <p className="text-xs text-muted-foreground leading-relaxed">
+                                {opt.description}
+                              </p>
+                            </div>
+
+                            <ul className="mt-3.5 pt-3 border-t border-border/60 space-y-1.5 text-[11px] text-muted-foreground">
+                              {opt.features.map((feat) => (
+                                <li key={feat} className="flex items-start gap-1.5">
+                                  <Check className="size-3 text-emerald-500 shrink-0 mt-0.5" />
+                                  <span className="leading-tight">{feat}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <Label htmlFor="auth-email">Email address</Label>
                   <Input
@@ -192,7 +623,10 @@ function AuthPage() {
                     placeholder="name@example.com"
                     className="h-12 rounded-xl text-base"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setIsUnconfirmed(false);
+                    }}
                     autoComplete="off"
                     autoCapitalize="none"
                     autoCorrect="off"
@@ -222,9 +656,20 @@ function AuthPage() {
                   <div
                     role="alert"
                     aria-live="polite"
-                    className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm font-medium text-destructive"
+                    className="rounded-xl border border-destructive/20 bg-destructive/10 p-3.5 text-sm font-medium text-destructive space-y-2"
                   >
-                    {error}
+                    <p>{error}</p>
+                    {isUnconfirmed && (
+                      <button
+                        type="button"
+                        onClick={handleResendVerification}
+                        disabled={resending}
+                        className="text-xs font-semibold text-primary underline hover:opacity-80 flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className={cn("size-3", resending && "animate-spin")} />
+                        {resending ? "Sending..." : "Click here to resend confirmation email"}
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -235,7 +680,13 @@ function AuthPage() {
                   className="w-full h-12 rounded-xl font-semibold shadow-brand"
                   disabled={busy}
                 >
-                  {busy ? "Please wait…" : mode === "in" ? "Sign in" : "Create account"}
+                  {busy
+                    ? "Please wait…"
+                    : mode === "in"
+                      ? "Sign in"
+                      : selectedRole
+                        ? `Create ${selectedRole === "attendee" ? "Attendee" : selectedRole === "creator" ? "Creator" : "Organizer"} Account`
+                        : "Create Account"}
                 </Button>
 
                 <div className="pt-2 text-center">
@@ -244,9 +695,10 @@ function AuthPage() {
                     onClick={() => {
                       setMode(mode === "in" ? "up" : "in");
                       setError(null);
+                      setIsUnconfirmed(false);
                       setPassword("");
                     }}
-                    className="text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg p-1"
+                    className="text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg p-1 cursor-pointer"
                   >
                     {mode === "in"
                       ? "Don't have an account? Sign up"

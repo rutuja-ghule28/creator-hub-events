@@ -12,12 +12,21 @@ import {
   Clock,
   Sparkles,
   ChevronLeft,
+  Megaphone,
+  Send,
+  AlertCircle,
+  Check,
+  X,
+  ExternalLink,
+  Globe,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   EVENT_SELECT,
   errMsg,
+  fmtCount,
   fmtDateTime,
   seatsLeft,
   useMe,
@@ -31,7 +40,9 @@ import {
   ListSkeleton,
   OfficialSeal,
   SeatsBar,
+  ExternalRedirectDialog,
 } from "@/components/cc";
+import { getSourceMeta, formatExternalPrice, type ExternalEvent } from "@/lib/external-events";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -76,6 +87,15 @@ export const Route = createFileRoute("/_authenticated/events/$id")({
   component: EventPage,
 });
 
+type CampaignApplicationRow = {
+  id: string;
+  event_id: string;
+  creator_id: string;
+  pitch: string;
+  status: "pending" | "accepted" | "rejected";
+  created_at: string;
+};
+
 function EventPage() {
   const { id } = Route.useParams();
   const { data: me } = useMe();
@@ -84,6 +104,11 @@ function EventPage() {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+
+  // Campaign Pitch Dialog state
+  const [pitchDialogOpen, setPitchDialogOpen] = useState(false);
+  const [pitchText, setPitchText] = useState("");
+  const [submittingPitch, setSubmittingPitch] = useState(false);
 
   // Form states
   const [fullName, setFullName] = useState(me?.profile?.full_name ?? "");
@@ -96,17 +121,60 @@ function EventPage() {
   const [reportReason, setReportReason] = useState("misleading");
   const [reportNote, setReportNote] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
+  const [externalRedirectOpen, setExternalRedirectOpen] = useState(false);
 
   const query = useQuery({
     queryKey: ["event", id],
     queryFn: async () => {
+      // 1. Try internal creator events
       const { data, error } = await supabase
         .from("events")
         .select(EVENT_SELECT)
         .eq("id", id)
-        .single();
+        .maybeSingle();
+
+      if (data) {
+        return {
+          sourceType: "creatorconnect" as const,
+          ...data,
+          external: null as ExternalEvent | null,
+        };
+      }
+
+      // 2. Try external verified events
+      const { data: extData } = await supabase
+        .from("external_events")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (extData) {
+        return {
+          sourceType: "external" as const,
+          id: extData.id,
+          title: extData.title,
+          type: extData.category,
+          description: extData.description,
+          starts_at: extData.starts_at,
+          venue: extData.venue_name,
+          area: extData.city,
+          capacity: 9999,
+          seats_taken: 0,
+          status: extData.status as "live" | "pending" | "rejected" | "removed",
+          cover_url: extData.cover_url,
+          creator_id: "",
+          organizer_id: extData.submitted_by_organizer_id ?? null,
+          promotion_brief: null,
+          target_niche: null,
+          application_deadline: null,
+          created_at: extData.created_at,
+          creator: null,
+          external: extData as ExternalEvent,
+        };
+      }
+
       if (error) throw error;
-      return data as unknown as EventWithCreator;
+      throw new Error("Event not found");
     },
   });
 
@@ -124,11 +192,42 @@ function EventPage() {
     enabled: !!id,
   });
 
+  // Query existing campaign application for current logged-in creator
+  const myApplicationQuery = useQuery({
+    queryKey: ["my-campaign-application", id, me?.creator?.id],
+    queryFn: async () => {
+      if (!me?.creator?.id || !id) return null;
+      const { data, error } = await supabase
+        .from("campaign_applications")
+        .select("*")
+        .eq("event_id", id)
+        .eq("creator_id", me.creator.id)
+        .maybeSingle();
+      if (error && error.code !== "PGRST116") throw error;
+      return data as CampaignApplicationRow | null;
+    },
+    enabled: !!me?.creator?.id && !!id,
+  });
+
   const e = query.data;
   const left = e ? seatsLeft(e) : 0;
+  const existingApp = myApplicationQuery.data;
+
+  const isOrganizer = !!(
+    (me?.creator?.id && e?.creator_id && me.creator.id === e.creator_id) ||
+    (me?.organizer?.id && e?.organizer_id && me.organizer.id === e.organizer_id)
+  );
+  const isPast = e?.starts_at ? new Date(e.starts_at) < new Date() : false;
+  const isDeadlinePassed = e?.application_deadline
+    ? new Date(e.application_deadline) < new Date()
+    : false;
 
   const handleRegisterSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
+    if (isPast) {
+      toast.error("Registration is closed because this event has concluded.");
+      return;
+    }
     if (!fullName.trim() || !email.trim() || !phone.trim()) {
       toast.error("Please fill in all required fields.");
       return;
@@ -149,12 +248,6 @@ function EventPage() {
 
       if (error) throw error;
 
-      // Update seats_taken
-      await supabase
-        .from("events")
-        .update({ seats_taken: e.seats_taken + seatsCount })
-        .eq("id", e.id);
-
       toast.success("Successfully registered! Check your tickets.");
       setRegisterOpen(false);
       qc.invalidateQueries({ queryKey: ["event", id] });
@@ -162,6 +255,44 @@ function EventPage() {
       toast.error(errMsg(err));
     } finally {
       setSubmittingReg(false);
+    }
+  };
+
+  const handleSubmitPitch = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    const cleanPitch = pitchText.trim();
+    if (!cleanPitch || cleanPitch.length < 10) {
+      toast.error("Pitch must be at least 10 characters long.");
+      return;
+    }
+    if (cleanPitch.length > 1500) {
+      toast.error("Pitch must not exceed 1500 characters.");
+      return;
+    }
+    if (!me?.creator?.id || !e?.id) {
+      toast.error("You need an active creator profile to apply.");
+      return;
+    }
+
+    setSubmittingPitch(true);
+    try {
+      const { error } = await supabase.from("campaign_applications").insert({
+        event_id: e.id,
+        creator_id: me.creator.id,
+        pitch: cleanPitch,
+        status: "pending",
+      });
+
+      if (error) throw error;
+
+      toast.success("Campaign pitch submitted successfully to organizer!");
+      setPitchDialogOpen(false);
+      setPitchText("");
+      qc.invalidateQueries({ queryKey: ["my-campaign-application", id, me?.creator?.id] });
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setSubmittingPitch(false);
     }
   };
 
@@ -196,7 +327,7 @@ function EventPage() {
       {/* Breadcrumb / Top Bar link */}
       <div className="mb-4 flex items-center justify-between">
         <Link
-          to="/discover"
+          to="/discover/1"
           className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="size-4" />
@@ -236,10 +367,21 @@ function EventPage() {
                 className="absolute inset-0 h-full w-full object-cover"
               />
               <div className="absolute top-4 left-4 flex items-center gap-2">
-                {e.status === "live" && <OfficialSeal />}
+                {isPast ? (
+                  <span className="rounded-full bg-black/75 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white/95 border border-white/20">
+                    Concluded
+                  </span>
+                ) : (
+                  e.status === "live" && <OfficialSeal />
+                )}
                 <span className="rounded-full bg-card/90 backdrop-blur-sm px-3 py-1 text-xs font-semibold text-foreground">
                   {e.type}
                 </span>
+                {e.promotion_brief && (
+                  <span className="rounded-full bg-primary/90 text-primary-foreground backdrop-blur-sm px-3 py-1 text-xs font-bold flex items-center gap-1 shadow-sm">
+                    <Sparkles className="size-3" /> Collab Campaign
+                  </span>
+                )}
               </div>
             </div>
 
@@ -268,6 +410,166 @@ function EventPage() {
                   "Join us for an exciting in-person creator event filled with networking, interactive sessions, and exclusive takeaways."}
               </p>
             </div>
+
+            {/* Creator Campaign / Collab Opportunity Card */}
+            {e.promotion_brief && (
+              <div className="rounded-3xl bg-brand/5 border border-brand/20 p-6 space-y-4 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-brand/20 pb-3">
+                  <div className="space-y-0.5">
+                    <h2 className="font-display font-bold text-lg text-foreground flex items-center gap-2">
+                      <Megaphone className="size-5 text-primary" />
+                      Creator Campaign & Collaboration
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      The organizer is actively inviting creators to participate and promote this
+                      event.
+                    </p>
+                  </div>
+
+                  <span
+                    className={`self-start sm:self-auto text-xs font-bold px-3 py-1 rounded-full ${
+                      isPast || isDeadlinePassed
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-trust-soft text-trust"
+                    }`}
+                  >
+                    {isPast
+                      ? "Event Concluded"
+                      : isDeadlinePassed
+                        ? "Applications Closed"
+                        : "Open for Pitches"}
+                  </span>
+                </div>
+
+                {/* Campaign Metadata Details */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-2xl bg-card border border-border space-y-0.5">
+                    <span className="text-muted-foreground uppercase text-[10px] font-bold">
+                      Target Creator Niche
+                    </span>
+                    <p className="font-semibold text-foreground text-sm">
+                      {e.target_niche || "All Categories"}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-card border border-border space-y-0.5">
+                    <span className="text-muted-foreground uppercase text-[10px] font-bold">
+                      Application Deadline
+                    </span>
+                    <p className="font-semibold text-foreground text-sm">
+                      {e.application_deadline
+                        ? fmtDateTime(e.application_deadline)
+                        : "Until Event Date"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Promotion Brief Text */}
+                <div className="space-y-1.5 text-xs">
+                  <span className="text-muted-foreground font-semibold uppercase tracking-wider block">
+                    Deliverable Brief & Expectations
+                  </span>
+                  <p className="text-sm text-foreground bg-card p-4 rounded-2xl border border-border leading-relaxed whitespace-pre-line">
+                    {e.promotion_brief}
+                  </p>
+                </div>
+
+                {/* Creator Application Status / Action Bar */}
+                <div className="pt-2">
+                  {isOrganizer ? (
+                    <div className="flex items-center justify-between p-3 rounded-2xl bg-card border border-border">
+                      <p className="text-xs text-muted-foreground">
+                        You are hosting this campaign. Review and manage all creator applications.
+                      </p>
+                      <Link to="/creator/events/$id/manage" params={{ id: e.id }}>
+                        <Button
+                          variant="brand"
+                          size="sm"
+                          className="rounded-xl text-xs font-semibold"
+                        >
+                          Manage Applications
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : existingApp ? (
+                    <div className="p-4 rounded-2xl bg-card border border-border space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="size-4 text-primary" /> Your Application
+                        </span>
+                        <span
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full capitalize ${
+                            existingApp.status === "accepted"
+                              ? "bg-trust-soft text-trust"
+                              : existingApp.status === "rejected"
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-warn-soft text-warn"
+                          }`}
+                        >
+                          {existingApp.status === "accepted"
+                            ? "🎉 Accepted Partner"
+                            : existingApp.status === "rejected"
+                              ? "Not Selected"
+                              : "Under Review"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground italic bg-muted/40 p-2.5 rounded-xl border border-border/50">
+                        "{existingApp.pitch}"
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Submitted{" "}
+                        {new Date(existingApp.created_at).toLocaleDateString("en-IN", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  ) : me?.creator ? (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-card border border-border">
+                      <div className="space-y-0.5 text-center sm:text-left">
+                        <p className="font-semibold text-xs text-foreground">
+                          Ready to collaborate on this event?
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Submit your promotional plan and pitch directly to the organizer.
+                        </p>
+                      </div>
+
+                      <Button
+                        variant="brand"
+                        onClick={() => setPitchDialogOpen(true)}
+                        disabled={isDeadlinePassed || isPast}
+                        className="rounded-xl gap-2 text-xs font-semibold shadow-brand w-full sm:w-auto"
+                      >
+                        <Sparkles className="size-3.5" />
+                        {isPast
+                          ? "Event Concluded"
+                          : isDeadlinePassed
+                            ? "Deadline Passed"
+                            : "Apply to Campaign"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-2xl bg-card border border-border text-xs text-muted-foreground flex items-center justify-between">
+                      <span>
+                        Creators can apply to this event campaign. Apply for creator verification to
+                        submit pitches.
+                      </span>
+                      <Link to="/profile">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl text-xs font-semibold"
+                        >
+                          View Profile
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Organiser Updates Timeline */}
             <div className="space-y-4 pt-4 border-t border-border">
@@ -338,18 +640,73 @@ function EventPage() {
           <div className="lg:col-span-4">
             <div className="sticky top-24 space-y-6 rounded-3xl bg-card border border-border p-6 shadow-md">
               {/* Event Price & Seats */}
-              <div className="space-y-4">
-                <div className="flex items-baseline justify-between">
-                  <span className="font-display text-2xl font-bold text-foreground">
-                    Free Ticket
-                  </span>
-                  <span className="text-xs font-semibold text-trust bg-trust-soft px-2.5 py-1 rounded-full">
-                    Official Entry
-                  </span>
-                </div>
+              {e.sourceType === "external" && e.external ? (
+                <div className="space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-display text-2xl font-bold text-foreground">
+                      {formatExternalPrice(
+                        e.external.is_free,
+                        e.external.ticket_price_min,
+                        e.external.ticket_price_max,
+                        e.external.currency,
+                      )}
+                    </span>
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full border inline-flex items-center gap-1 ${
+                        getSourceMeta(e.external.source_name).badgeClass
+                      }`}
+                    >
+                      <Globe className="size-3" />
+                      {getSourceMeta(e.external.source_name).label}
+                    </span>
+                  </div>
 
-                <SeatsBar taken={e.seats_taken} capacity={e.capacity} />
-              </div>
+                  <div className="rounded-2xl bg-muted/40 p-4 border border-border space-y-2 text-xs">
+                    <p className="font-semibold text-foreground flex items-center gap-1.5">
+                      <Globe className="size-3.5 text-primary" />
+                      Official External Listing
+                    </p>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Tickets and booking confirmation are handled directly by{" "}
+                      {getSourceMeta(e.external.source_name).label}.
+                    </p>
+                  </div>
+                </div>
+              ) : isPast ? (
+                <div className="space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-display text-2xl font-bold text-muted-foreground">
+                      Concluded
+                    </span>
+                    <span className="text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full border border-border">
+                      Past Event
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl bg-muted/50 p-4 border border-border space-y-1.5">
+                    <p className="text-xs font-semibold text-foreground">Registration Closed</p>
+                    <p className="text-xs text-muted-foreground">
+                      This meetup concluded on {fmtDateTime(e.starts_at)}.
+                    </p>
+                    <p className="text-[11px] text-muted-foreground pt-1 border-t border-border/60">
+                      Registered Passes: {e.seats_taken} / Capacity: {e.capacity}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-display text-2xl font-bold text-foreground">
+                      Free Ticket
+                    </span>
+                    <span className="text-xs font-semibold text-trust bg-trust-soft px-2.5 py-1 rounded-full">
+                      Official Entry
+                    </span>
+                  </div>
+
+                  <SeatsBar taken={e.seats_taken} capacity={e.capacity} />
+                </div>
+              )}
 
               {/* Creator Card Row with Follow Button */}
               {e.creator && (
@@ -392,15 +749,47 @@ function EventPage() {
               )}
 
               {/* Action Button */}
-              <Button
-                variant="brand"
-                size="lg"
-                className="w-full text-base font-semibold h-12 rounded-2xl shadow-brand"
-                disabled={left === 0}
-                onClick={() => setRegisterOpen(true)}
-              >
-                {left === 0 ? "Sold out" : "Register now — Free"}
-              </Button>
+              {e.sourceType === "external" && e.external ? (
+                isPast ? (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full text-base font-semibold h-12 rounded-2xl cursor-not-allowed opacity-75"
+                    disabled
+                  >
+                    Event Concluded
+                  </Button>
+                ) : (
+                  <Button
+                    variant="brand"
+                    size="lg"
+                    className="w-full text-base font-semibold h-12 rounded-2xl shadow-brand gap-2"
+                    onClick={() => setExternalRedirectOpen(true)}
+                  >
+                    <span>Book on {getSourceMeta(e.external.source_name).label}</span>
+                    <ExternalLink className="size-4" />
+                  </Button>
+                )
+              ) : isPast ? (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full text-base font-semibold h-12 rounded-2xl cursor-not-allowed opacity-75"
+                  disabled
+                >
+                  Registration Closed — Concluded
+                </Button>
+              ) : (
+                <Button
+                  variant="brand"
+                  size="lg"
+                  className="w-full text-base font-semibold h-12 rounded-2xl shadow-brand"
+                  disabled={left === 0}
+                  onClick={() => setRegisterOpen(true)}
+                >
+                  {left === 0 ? "Sold out" : "Register now — Free"}
+                </Button>
+              )}
 
               <div className="space-y-2 text-xs text-muted-foreground">
                 <p className="flex items-center gap-2">
@@ -422,20 +811,62 @@ function EventPage() {
         <div className="md:hidden fixed bottom-16 inset-x-0 z-20 bg-card/95 border-t border-border p-4 backdrop-blur shadow-lg flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground">
-              {left === 0 ? "Sold out" : `${left} seats remaining`}
+              {isPast
+                ? "Event concluded"
+                : e.sourceType === "external" && e.external
+                  ? getSourceMeta(e.external.source_name).label
+                  : left === 0
+                    ? "Sold out"
+                    : `${left} seats remaining`}
             </p>
-            <p className="font-display font-bold text-lg text-foreground">Free Entry</p>
+            <p className="font-display font-bold text-lg text-foreground">
+              {isPast
+                ? "Concluded"
+                : e.sourceType === "external" && e.external
+                  ? formatExternalPrice(
+                      e.external.is_free,
+                      e.external.ticket_price_min,
+                      e.external.ticket_price_max,
+                      e.external.currency,
+                    )
+                  : "Free Entry"}
+            </p>
           </div>
           <Button
-            variant="brand"
+            variant={isPast ? "outline" : "brand"}
             size="lg"
-            className="rounded-2xl px-6"
-            disabled={left === 0}
-            onClick={() => setRegisterOpen(true)}
+            className="rounded-2xl px-6 gap-1"
+            disabled={isPast || (e.sourceType !== "external" && left === 0)}
+            onClick={() => {
+              if (isPast) return;
+              if (e.sourceType === "external") {
+                setExternalRedirectOpen(true);
+              } else {
+                setRegisterOpen(true);
+              }
+            }}
           >
-            {left === 0 ? "Sold out" : "Register"}
+            <span>
+              {isPast
+                ? "Concluded"
+                : e.sourceType === "external"
+                  ? "Book Tickets"
+                  : left === 0
+                    ? "Sold out"
+                    : "Register"}
+            </span>
+            {!isPast && e.sourceType === "external" && <ExternalLink className="size-3.5" />}
           </Button>
         </div>
+      )}
+
+      {/* External Redirect Dialog */}
+      {e?.external && (
+        <ExternalRedirectDialog
+          open={externalRedirectOpen}
+          onOpenChange={setExternalRedirectOpen}
+          event={e.external}
+        />
       )}
 
       {/* Registration Dialog */}
@@ -541,6 +972,76 @@ function EventPage() {
                   <span>₹0</span>
                 </div>
               </div>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Campaign Pitch Application Dialog */}
+      <Dialog open={pitchDialogOpen} onOpenChange={setPitchDialogOpen}>
+        <DialogContent className="sm:max-w-lg rounded-3xl p-6">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-bold flex items-center gap-2">
+              <Megaphone className="size-5 text-primary" /> Apply for Creator Campaign
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Submit your promotional pitch and deliverable plan to the event organizer.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmitPitch} className="space-y-4 pt-2">
+            {/* Applicant Profile Snapshot */}
+            {me?.creator && (
+              <div className="flex items-center gap-3 p-3 rounded-2xl bg-muted/40 border border-border">
+                <Avatar name={me.creator.display_name} src={me.creator.avatar_url} size={40} />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm truncate">{me.creator.display_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {me.creator.category} · {fmtCount(me.creator.audience_size)} followers
+                  </p>
+                </div>
+                {me.creator.verified && (
+                  <span className="text-[10px] font-bold text-trust bg-trust-soft px-2 py-0.5 rounded-full">
+                    Verified
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="pitch-text">Your Promotional Pitch & Content Plan</Label>
+              <textarea
+                id="pitch-text"
+                value={pitchText}
+                onChange={(ev) => setPitchText(ev.target.value)}
+                rows={5}
+                placeholder="Explain what content you will create (reels, stories, posts), your audience demographics, and why you are a great fit for this event..."
+                className="w-full rounded-2xl border border-input bg-background p-3.5 text-sm focus:ring-2 focus:ring-ring resize-none"
+                required
+                minLength={10}
+                maxLength={1500}
+              />
+              <div className="flex justify-between text-[11px] text-muted-foreground px-1">
+                <span>Minimum 10 characters</span>
+                <span className={pitchText.length > 1400 ? "text-warn font-semibold" : ""}>
+                  {pitchText.length} / 1500
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => setPitchDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="brand"
+                disabled={submittingPitch || pitchText.trim().length < 10}
+                className="gap-2 shadow-brand"
+              >
+                <Send className="size-3.5" />
+                {submittingPitch ? "Submitting..." : "Send Application Pitch"}
+              </Button>
             </div>
           </form>
         </DialogContent>

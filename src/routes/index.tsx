@@ -31,6 +31,6 @@ export const Route = createFileRoute("/")({
     links: [{ rel: "canonical", href: "https://creatorconnect.app/" }],
   }),
   beforeLoad: () => {
-    throw redirect({ to: "/discover" });
+    throw redirect({ to: "/discover/1" });
   },
 });
