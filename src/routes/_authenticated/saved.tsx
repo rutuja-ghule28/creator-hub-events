@@ -86,7 +86,7 @@ function SavedEventsPage() {
           body="Explore upcoming creator meetups and tap the bookmark icon to save them for later."
           action={
             <Button asChild variant="brand">
-              <Link to="/discover">
+              <Link to="/discover/1">
                 <Compass className="mr-2 size-4" /> Discover Events
               </Link>
             </Button>

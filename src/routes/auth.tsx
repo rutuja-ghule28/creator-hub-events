@@ -1,16 +1,29 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { Mail, CheckCircle2, ArrowLeft, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { errMsg } from "@/lib/cc";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Search = { redirect?: string | undefined };
+type Search = {
+  redirect?: string | undefined;
+  error?: string | undefined;
+  error_code?: string | undefined;
+  error_description?: string | undefined;
+  confirmed?: string | undefined;
+};
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>): Search => ({
     redirect: typeof s["redirect"] === "string" ? s["redirect"] : undefined,
+    error: typeof s["error"] === "string" ? s["error"] : undefined,
+    error_code: typeof s["error_code"] === "string" ? s["error_code"] : undefined,
+    error_description: typeof s["error_description"] === "string" ? s["error_description"] : undefined,
+    confirmed: typeof s["confirmed"] === "string" ? s["confirmed"] : undefined,
   }),
   head: () => ({
     meta: [
@@ -48,28 +61,127 @@ const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 function AuthPage() {
   const nav = useNavigate();
-  const { redirect } = Route.useSearch();
+  const search = Route.useSearch();
+  const redirect = search.redirect;
   const [mode, setMode] = useState<"in" | "up">("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUnconfirmed, setIsUnconfirmed] = useState(false);
   const [sent, setSent] = useState(false);
+  const [confirmedSuccess, setConfirmedSuccess] = useState(false);
 
   const target =
     redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/discover";
 
+  // Check URL query parameters and hash fragments for email confirmation redirects & errors
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const hash = window.location.hash ? window.location.hash.slice(1) : "";
+    const hashParams = new URLSearchParams(hash);
+
+    // Check for auth error params from confirmation redirects
+    const err = searchParams.get("error") || hashParams.get("error");
+    const errCode = searchParams.get("error_code") || hashParams.get("error_code");
+    const errDesc = searchParams.get("error_description") || hashParams.get("error_description");
+
+    if (err || errCode || errDesc) {
+      if (errCode === "otp_expired" || errDesc?.toLowerCase().includes("expired")) {
+        setError("This email verification link has expired. Please sign in below or request a new confirmation email.");
+        toast.error("Verification link has expired.");
+      } else {
+        const decoded = errDesc
+          ? decodeURIComponent(errDesc.replace(/\+/g, " "))
+          : "Invalid or expired confirmation link.";
+        setError(decoded);
+        toast.error(decoded);
+      }
+      setMode("in");
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      return;
+    }
+
+    // Check if user arrived via confirmation redirect
+    if (search.confirmed === "true" || hashParams.get("type") === "signup" || hashParams.get("access_token")) {
+      setConfirmedSuccess(true);
+    }
+
+    // Listen for auth state changes (e.g. token exchanged from email verification)
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        toast.success("Email verified successfully! Welcome to CreatorConnect.");
+        nav({ to: target });
+      }
+    });
+
+    // If active session exists, navigate directly to target
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        nav({ to: target });
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [nav, target, search.confirmed]);
+
+  async function handleResendVerification() {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+      toast.error("Please enter a valid email address to resend confirmation.");
+      return;
+    }
+    setResending(true);
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const redirectUrl = origin
+        ? `${origin}/auth?redirect=${encodeURIComponent(target)}&confirmed=true`
+        : undefined;
+
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup",
+        email: cleanEmail,
+        ...(redirectUrl ? { options: { emailRedirectTo: redirectUrl } } : {}),
+      });
+
+      if (resendError) {
+        toast.error(resendError.message);
+      } else {
+        toast.success("Verification email resent! Please check your inbox.");
+      }
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setResending(false);
+    }
+  }
+
   async function signIn(e: string, p: string) {
     setBusy(true);
     setError(null);
+    setIsUnconfirmed(false);
     const { error: authError } = await supabase.auth.signInWithPassword({
       email: e.trim(),
       password: p,
     });
     setBusy(false);
     if (authError) {
+      if (authError.message?.toLowerCase().includes("email not confirmed")) {
+        setIsUnconfirmed(true);
+        return setError(
+          "Please confirm your email before signing in. Check your inbox for the verification link.",
+        );
+      }
       return setError("Invalid email or password. Please check your credentials and try again.");
     }
+    toast.success("Signed in successfully!");
     nav({ to: target });
   }
 
@@ -94,19 +206,31 @@ function AuthPage() {
       return signIn(cleanEmail, password);
     }
 
-    // Sign up mode: strictly email + password
+    // Sign up mode
     setBusy(true);
     setError(null);
+    setIsUnconfirmed(false);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const { error: signUpError } = await supabase.auth.signUp({
+    const redirectUrl = origin
+      ? `${origin}/auth?redirect=${encodeURIComponent(target)}&confirmed=true`
+      : undefined;
+
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
-      ...(origin ? { options: { emailRedirectTo: origin } } : {}),
+      ...(redirectUrl ? { options: { emailRedirectTo: redirectUrl } } : {}),
     });
     setBusy(false);
 
     if (signUpError) {
       return setError(signUpError.message);
+    }
+
+    // If auto-confirm is enabled or session exists immediately
+    if (signUpData?.session) {
+      toast.success("Account created successfully!");
+      nav({ to: target });
+      return;
     }
 
     setSent(true);
@@ -115,7 +239,7 @@ function AuthPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      {/* Semantic Header with New Official Logo */}
+      {/* Semantic Header with Official Logo */}
       <header className="border-b border-border/50 px-6 py-4">
         <div className="mx-auto flex max-w-md items-center justify-between">
           <Link
@@ -157,29 +281,62 @@ function AuthPage() {
           </div>
 
           {sent ? (
-            <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-              <div className="mb-3 inline-flex size-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
-                ✓
+            <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+              <div className="mb-4 inline-flex size-12 items-center justify-center rounded-2xl bg-brand/10 text-primary">
+                <Mail className="size-6 text-primary" />
               </div>
-              <h2 className="text-lg font-semibold text-foreground">Check your inbox</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                We sent a verification link to <strong className="text-foreground">{email}</strong>.
-                Open it to finish creating your account.
+              <h2 className="text-xl font-bold tracking-tight text-foreground">
+                Verify your email address
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                We sent an official confirmation link to{" "}
+                <strong className="text-foreground font-semibold">{email}</strong>. Please check
+                your inbox (and spam folder) and click the link to activate your CreatorConnect
+                account.
               </p>
-              <Button
-                variant="outline"
-                className="mt-6 w-full rounded-xl"
-                onClick={() => {
-                  setSent(false);
-                  setMode("in");
-                  setPassword("");
-                }}
-              >
-                Back to Sign in
-              </Button>
+
+              <div className="mt-6 rounded-2xl bg-muted/50 p-4 border border-border/60 text-xs text-muted-foreground space-y-1">
+                <p className="font-semibold text-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="size-3.5 text-emerald-500" /> What to expect:
+                </p>
+                <p>• Clicking the link will verify your email and redirect you to the portal.</p>
+                <p>• If you don't see the email within a few minutes, check your spam or junk folder.</p>
+              </div>
+
+              <div className="mt-6 flex flex-col gap-2.5">
+                <Button
+                  variant="outline"
+                  className="w-full h-11 rounded-xl font-medium"
+                  disabled={resending}
+                  onClick={handleResendVerification}
+                >
+                  <RefreshCw className={cn("size-4 mr-2", resending && "animate-spin")} />
+                  {resending ? "Resending..." : "Resend verification email"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full h-11 rounded-xl text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setSent(false);
+                    setMode("in");
+                    setPassword("");
+                    setError(null);
+                  }}
+                >
+                  <ArrowLeft className="size-4 mr-2" />
+                  Back to Sign in
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+              {confirmedSuccess && (
+                <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3.5 text-sm font-medium text-emerald-600 flex items-center gap-2">
+                  <CheckCircle2 className="size-5 shrink-0" />
+                  <span>Email verified successfully! Please sign in with your password.</span>
+                </div>
+              )}
+
               <form onSubmit={submit} className="space-y-4" noValidate autoComplete="off">
                 <div className="space-y-1.5">
                   <Label htmlFor="auth-email">Email address</Label>
@@ -192,7 +349,10 @@ function AuthPage() {
                     placeholder="name@example.com"
                     className="h-12 rounded-xl text-base"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setIsUnconfirmed(false);
+                    }}
                     autoComplete="off"
                     autoCapitalize="none"
                     autoCorrect="off"
@@ -222,9 +382,20 @@ function AuthPage() {
                   <div
                     role="alert"
                     aria-live="polite"
-                    className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm font-medium text-destructive"
+                    className="rounded-xl border border-destructive/20 bg-destructive/10 p-3.5 text-sm font-medium text-destructive space-y-2"
                   >
-                    {error}
+                    <p>{error}</p>
+                    {isUnconfirmed && (
+                      <button
+                        type="button"
+                        onClick={handleResendVerification}
+                        disabled={resending}
+                        className="text-xs font-semibold text-primary underline hover:opacity-80 flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className={cn("size-3", resending && "animate-spin")} />
+                        {resending ? "Sending..." : "Click here to resend confirmation email"}
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -244,9 +415,10 @@ function AuthPage() {
                     onClick={() => {
                       setMode(mode === "in" ? "up" : "in");
                       setError(null);
+                      setIsUnconfirmed(false);
                       setPassword("");
                     }}
-                    className="text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg p-1"
+                    className="text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg p-1 cursor-pointer"
                   >
                     {mode === "in"
                       ? "Don't have an account? Sign up"

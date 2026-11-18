@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Sparkles, CalendarDays, MapPin, Plus, ArrowLeft } from "lucide-react";
+import { Sparkles, CalendarDays, MapPin, Plus, ArrowLeft, Clock, Megaphone } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EVENT_TYPES, NICHES, errMsg, useMe } from "@/lib/cc";
@@ -54,6 +54,16 @@ function CreateEventPage() {
     return d.toISOString().slice(0, 16);
   });
   const [targetNiche, setTargetNiche] = useState<string>("Tech reviewer");
+
+  // Creator Campaign & Promotion Brief state
+  const [hasCampaign, setHasCampaign] = useState(false);
+  const [promotionBrief, setPromotionBrief] = useState("");
+  const [applicationDeadline, setApplicationDeadline] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 5);
+    return d.toISOString().slice(0, 16);
+  });
+
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,6 +74,11 @@ function CreateEventPage() {
     }
     if (!me?.creator?.id) {
       toast.error("You need an active Creator profile to publish events.");
+      return;
+    }
+
+    if (hasCampaign && !promotionBrief.trim()) {
+      toast.error("Please specify the promotion brief for creator collaboration.");
       return;
     }
 
@@ -81,6 +96,11 @@ function CreateEventPage() {
           capacity: Number(capacity),
           starts_at: new Date(startsAt).toISOString(),
           target_niche: targetNiche,
+          promotion_brief: hasCampaign && promotionBrief.trim() ? promotionBrief.trim() : null,
+          application_deadline:
+            hasCampaign && applicationDeadline
+              ? new Date(applicationDeadline).toISOString()
+              : null,
           status: "pending",
         })
         .select()
@@ -154,7 +174,7 @@ function CreateEventPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="evt-niche">Target Category</Label>
+                <Label htmlFor="evt-niche">Primary Category</Label>
                 <select
                   id="evt-niche"
                   value={targetNiche}
@@ -176,7 +196,7 @@ function CreateEventPage() {
                 id="evt-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={4}
+                rows={3}
                 placeholder="Describe what attendees can expect, schedule, and guest highlights..."
                 className="w-full rounded-xl border border-input bg-background p-3 text-sm focus:ring-2 focus:ring-ring resize-none"
               />
@@ -229,6 +249,77 @@ function CreateEventPage() {
                   required
                 />
               </div>
+            </div>
+
+            {/* Creator Collaboration / Campaign Brief Section */}
+            <div className="rounded-2xl border border-brand/30 bg-brand/5 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Sparkles className="size-4 text-primary" /> Creator Campaign & Collaboration
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Invite creators in your niche to apply, submit pitches, and promote your event.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={hasCampaign}
+                    onChange={(e) => setHasCampaign(e.target.checked)}
+                    className="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-foreground">
+                    {hasCampaign ? "Active" : "Enable"}
+                  </span>
+                </label>
+              </div>
+
+              {hasCampaign && (
+                <div className="space-y-3.5 pt-3 border-t border-brand/20">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="evt-brief">Promotion Brief & Deliverables</Label>
+                    <textarea
+                      id="evt-brief"
+                      value={promotionBrief}
+                      onChange={(e) => setPromotionBrief(e.target.value)}
+                      rows={3}
+                      placeholder="e.g. Seeking local creators to attend the event, post 1 reel and 2 stories before the date, and participate in a live speaker session."
+                      className="w-full rounded-xl border border-input bg-background p-3 text-sm focus:ring-2 focus:ring-ring resize-none"
+                      required={hasCampaign}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="evt-deadline">Application Deadline</Label>
+                      <Input
+                        id="evt-deadline"
+                        type="datetime-local"
+                        value={applicationDeadline}
+                        onChange={(e) => setApplicationDeadline(e.target.value)}
+                        required={hasCampaign}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="evt-collab-niche">Target Creator Niche</Label>
+                      <select
+                        id="evt-collab-niche"
+                        value={targetNiche}
+                        onChange={(e) => setTargetNiche(e.target.value)}
+                        className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-ring"
+                      >
+                        {NICHES.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -287,6 +378,17 @@ function CreateEventPage() {
                     {venue || "Venue name"}, {area}
                   </p>
                 </div>
+
+                {hasCampaign && (
+                  <div className="rounded-xl bg-brand/10 border border-brand/20 p-2.5 text-xs space-y-1">
+                    <p className="font-semibold text-primary flex items-center gap-1.5">
+                      <Megaphone className="size-3.5" /> Creator Campaign Open
+                    </p>
+                    <p className="text-[11px] text-muted-foreground line-clamp-2">
+                      {promotionBrief || "Campaign brief and creator deliverables specified here."}
+                    </p>
+                  </div>
+                )}
 
                 <div className="pt-2 border-t border-border flex justify-between text-xs font-semibold">
                   <span>Available Seats</span>

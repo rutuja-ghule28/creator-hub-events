@@ -12,12 +12,18 @@ import {
   Clock,
   Sparkles,
   ChevronLeft,
+  Megaphone,
+  Send,
+  AlertCircle,
+  Check,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   EVENT_SELECT,
   errMsg,
+  fmtCount,
   fmtDateTime,
   seatsLeft,
   useMe,
@@ -76,6 +82,15 @@ export const Route = createFileRoute("/_authenticated/events/$id")({
   component: EventPage,
 });
 
+type CampaignApplicationRow = {
+  id: string;
+  event_id: string;
+  creator_id: string;
+  pitch: string;
+  status: "pending" | "accepted" | "rejected";
+  created_at: string;
+};
+
 function EventPage() {
   const { id } = Route.useParams();
   const { data: me } = useMe();
@@ -84,6 +99,11 @@ function EventPage() {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+
+  // Campaign Pitch Dialog state
+  const [pitchDialogOpen, setPitchDialogOpen] = useState(false);
+  const [pitchText, setPitchText] = useState("");
+  const [submittingPitch, setSubmittingPitch] = useState(false);
 
   // Form states
   const [fullName, setFullName] = useState(me?.profile?.full_name ?? "");
@@ -124,8 +144,31 @@ function EventPage() {
     enabled: !!id,
   });
 
+  // Query existing campaign application for current logged-in creator
+  const myApplicationQuery = useQuery({
+    queryKey: ["my-campaign-application", id, me?.creator?.id],
+    queryFn: async () => {
+      if (!me?.creator?.id || !id) return null;
+      const { data, error } = await supabase
+        .from("campaign_applications")
+        .select("*")
+        .eq("event_id", id)
+        .eq("creator_id", me.creator.id)
+        .maybeSingle();
+      if (error && error.code !== "PGRST116") throw error;
+      return data as CampaignApplicationRow | null;
+    },
+    enabled: !!me?.creator?.id && !!id,
+  });
+
   const e = query.data;
   const left = e ? seatsLeft(e) : 0;
+  const existingApp = myApplicationQuery.data;
+
+  const isOrganizer = !!(me?.creator?.id && e?.creator_id && me.creator.id === e.creator_id);
+  const isDeadlinePassed = e?.application_deadline
+    ? new Date(e.application_deadline) < new Date()
+    : false;
 
   const handleRegisterSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -149,12 +192,6 @@ function EventPage() {
 
       if (error) throw error;
 
-      // Update seats_taken
-      await supabase
-        .from("events")
-        .update({ seats_taken: e.seats_taken + seatsCount })
-        .eq("id", e.id);
-
       toast.success("Successfully registered! Check your tickets.");
       setRegisterOpen(false);
       qc.invalidateQueries({ queryKey: ["event", id] });
@@ -162,6 +199,44 @@ function EventPage() {
       toast.error(errMsg(err));
     } finally {
       setSubmittingReg(false);
+    }
+  };
+
+  const handleSubmitPitch = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    const cleanPitch = pitchText.trim();
+    if (!cleanPitch || cleanPitch.length < 10) {
+      toast.error("Pitch must be at least 10 characters long.");
+      return;
+    }
+    if (cleanPitch.length > 1500) {
+      toast.error("Pitch must not exceed 1500 characters.");
+      return;
+    }
+    if (!me?.creator?.id || !e?.id) {
+      toast.error("You need an active creator profile to apply.");
+      return;
+    }
+
+    setSubmittingPitch(true);
+    try {
+      const { error } = await supabase.from("campaign_applications").insert({
+        event_id: e.id,
+        creator_id: me.creator.id,
+        pitch: cleanPitch,
+        status: "pending",
+      });
+
+      if (error) throw error;
+
+      toast.success("Campaign pitch submitted successfully to organizer!");
+      setPitchDialogOpen(false);
+      setPitchText("");
+      qc.invalidateQueries({ queryKey: ["my-campaign-application", id, me?.creator?.id] });
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setSubmittingPitch(false);
     }
   };
 
@@ -196,7 +271,7 @@ function EventPage() {
       {/* Breadcrumb / Top Bar link */}
       <div className="mb-4 flex items-center justify-between">
         <Link
-          to="/discover"
+          to="/discover/1"
           className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="size-4" />
@@ -240,6 +315,11 @@ function EventPage() {
                 <span className="rounded-full bg-card/90 backdrop-blur-sm px-3 py-1 text-xs font-semibold text-foreground">
                   {e.type}
                 </span>
+                {e.promotion_brief && (
+                  <span className="rounded-full bg-primary/90 text-primary-foreground backdrop-blur-sm px-3 py-1 text-xs font-bold flex items-center gap-1 shadow-sm">
+                    <Sparkles className="size-3" /> Collab Campaign
+                  </span>
+                )}
               </div>
             </div>
 
@@ -268,6 +348,138 @@ function EventPage() {
                   "Join us for an exciting in-person creator event filled with networking, interactive sessions, and exclusive takeaways."}
               </p>
             </div>
+
+            {/* Creator Campaign / Collab Opportunity Card */}
+            {e.promotion_brief && (
+              <div className="rounded-3xl bg-brand/5 border border-brand/20 p-6 space-y-4 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-brand/20 pb-3">
+                  <div className="space-y-0.5">
+                    <h2 className="font-display font-bold text-lg text-foreground flex items-center gap-2">
+                      <Megaphone className="size-5 text-primary" />
+                      Creator Campaign & Collaboration
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      The organizer is actively inviting creators to participate and promote this event.
+                    </p>
+                  </div>
+
+                  <span
+                    className={`self-start sm:self-auto text-xs font-bold px-3 py-1 rounded-full ${
+                      isDeadlinePassed
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-trust-soft text-trust"
+                    }`}
+                  >
+                    {isDeadlinePassed ? "Applications Closed" : "Open for Pitches"}
+                  </span>
+                </div>
+
+                {/* Campaign Metadata Details */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-2xl bg-card border border-border space-y-0.5">
+                    <span className="text-muted-foreground uppercase text-[10px] font-bold">
+                      Target Creator Niche
+                    </span>
+                    <p className="font-semibold text-foreground text-sm">
+                      {e.target_niche || "All Categories"}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-card border border-border space-y-0.5">
+                    <span className="text-muted-foreground uppercase text-[10px] font-bold">
+                      Application Deadline
+                    </span>
+                    <p className="font-semibold text-foreground text-sm">
+                      {e.application_deadline ? fmtDateTime(e.application_deadline) : "Until Event Date"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Promotion Brief Text */}
+                <div className="space-y-1.5 text-xs">
+                  <span className="text-muted-foreground font-semibold uppercase tracking-wider block">
+                    Deliverable Brief & Expectations
+                  </span>
+                  <p className="text-sm text-foreground bg-card p-4 rounded-2xl border border-border leading-relaxed whitespace-pre-line">
+                    {e.promotion_brief}
+                  </p>
+                </div>
+
+                {/* Creator Application Status / Action Bar */}
+                <div className="pt-2">
+                  {isOrganizer ? (
+                    <div className="flex items-center justify-between p-3 rounded-2xl bg-card border border-border">
+                      <p className="text-xs text-muted-foreground">
+                        You are hosting this campaign. Review and manage all creator applications.
+                      </p>
+                      <Link to="/creator/events/$id/manage" params={{ id: e.id }}>
+                        <Button variant="brand" size="sm" className="rounded-xl text-xs font-semibold">
+                          Manage Applications
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : existingApp ? (
+                    <div className="p-4 rounded-2xl bg-card border border-border space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="size-4 text-primary" /> Your Application
+                        </span>
+                        <span
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full capitalize ${
+                            existingApp.status === "accepted"
+                              ? "bg-trust-soft text-trust"
+                              : existingApp.status === "rejected"
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-warn-soft text-warn"
+                          }`}
+                        >
+                          {existingApp.status === "accepted"
+                            ? "🎉 Accepted Partner"
+                            : existingApp.status === "rejected"
+                              ? "Not Selected"
+                              : "Under Review"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground italic bg-muted/40 p-2.5 rounded-xl border border-border/50">
+                        "{existingApp.pitch}"
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Submitted {new Date(existingApp.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  ) : me?.creator ? (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-card border border-border">
+                      <div className="space-y-0.5 text-center sm:text-left">
+                        <p className="font-semibold text-xs text-foreground">
+                          Ready to collaborate on this event?
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Submit your promotional plan and pitch directly to the organizer.
+                        </p>
+                      </div>
+
+                      <Button
+                        variant="brand"
+                        onClick={() => setPitchDialogOpen(true)}
+                        disabled={isDeadlinePassed}
+                        className="rounded-xl gap-2 text-xs font-semibold shadow-brand w-full sm:w-auto"
+                      >
+                        <Sparkles className="size-3.5" />
+                        {isDeadlinePassed ? "Deadline Passed" : "Apply to Campaign"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-2xl bg-card border border-border text-xs text-muted-foreground flex items-center justify-between">
+                      <span>Creators can apply to this event campaign. Apply for creator verification to submit pitches.</span>
+                      <Link to="/profile">
+                        <Button variant="outline" size="sm" className="rounded-xl text-xs font-semibold">
+                          View Profile
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Organiser Updates Timeline */}
             <div className="space-y-4 pt-4 border-t border-border">
@@ -541,6 +753,76 @@ function EventPage() {
                   <span>₹0</span>
                 </div>
               </div>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Campaign Pitch Application Dialog */}
+      <Dialog open={pitchDialogOpen} onOpenChange={setPitchDialogOpen}>
+        <DialogContent className="sm:max-w-lg rounded-3xl p-6">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-bold flex items-center gap-2">
+              <Megaphone className="size-5 text-primary" /> Apply for Creator Campaign
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Submit your promotional pitch and deliverable plan to the event organizer.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmitPitch} className="space-y-4 pt-2">
+            {/* Applicant Profile Snapshot */}
+            {me?.creator && (
+              <div className="flex items-center gap-3 p-3 rounded-2xl bg-muted/40 border border-border">
+                <Avatar name={me.creator.display_name} src={me.creator.avatar_url} size={40} />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm truncate">{me.creator.display_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {me.creator.category} · {fmtCount(me.creator.audience_size)} followers
+                  </p>
+                </div>
+                {me.creator.verified && (
+                  <span className="text-[10px] font-bold text-trust bg-trust-soft px-2 py-0.5 rounded-full">
+                    Verified
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="pitch-text">Your Promotional Pitch & Content Plan</Label>
+              <textarea
+                id="pitch-text"
+                value={pitchText}
+                onChange={(ev) => setPitchText(ev.target.value)}
+                rows={5}
+                placeholder="Explain what content you will create (reels, stories, posts), your audience demographics, and why you are a great fit for this event..."
+                className="w-full rounded-2xl border border-input bg-background p-3.5 text-sm focus:ring-2 focus:ring-ring resize-none"
+                required
+                minLength={10}
+                maxLength={1500}
+              />
+              <div className="flex justify-between text-[11px] text-muted-foreground px-1">
+                <span>Minimum 10 characters</span>
+                <span className={pitchText.length > 1400 ? "text-warn font-semibold" : ""}>
+                  {pitchText.length} / 1500
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => setPitchDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="brand"
+                disabled={submittingPitch || pitchText.trim().length < 10}
+                className="gap-2 shadow-brand"
+              >
+                <Send className="size-3.5" />
+                {submittingPitch ? "Submitting..." : "Send Application Pitch"}
+              </Button>
             </div>
           </form>
         </DialogContent>

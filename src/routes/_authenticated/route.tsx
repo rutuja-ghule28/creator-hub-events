@@ -66,7 +66,7 @@ function AuthedLayout() {
   }
 
   const mobileTabs = [
-    { to: "/discover", label: "Discover", icon: Compass, exact: true },
+    { to: "/discover/1", label: "Discover", icon: Compass, exact: true },
     { to: "/tickets", label: "Tickets", icon: Ticket },
     { to: "/saved", label: "Saved", icon: Bookmark },
     { to: "/notifications", label: "Notifs", icon: Bell },

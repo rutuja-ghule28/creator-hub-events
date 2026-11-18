@@ -1,10 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShieldCheck, Check, X, Calendar, UserCheck } from "lucide-react";
+import {
+  ShieldCheck,
+  Check,
+  X,
+  Calendar,
+  UserCheck,
+  ExternalLink,
+  Mail,
+  Phone,
+  Save,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  BadgeCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { EVENT_SELECT, errMsg, fmtDateTime, type Creator, type EventWithCreator } from "@/lib/cc";
+import {
+  EVENT_SELECT,
+  VERIFIABLE_FIELDS,
+  errMsg,
+  fmtCount,
+  fmtDateTime,
+  type Creator,
+  type EventWithCreator,
+} from "@/lib/cc";
 import {
   Avatar,
   CreatorName,
@@ -52,7 +74,13 @@ export const Route = createFileRoute("/_authenticated/admin/verify")({
 function AdminVerifyPage() {
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<"events" | "creators">("events");
+  const [creatorStatusFilter, setCreatorStatusFilter] = useState<"pending" | "verified" | "all">("pending");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Individual verification fields state for selected creator
+  const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  const [savingFields, setSavingFields] = useState(false);
+  const [processingReview, setProcessingReview] = useState(false);
 
   // Pending events queue query
   const pendingEventsQuery = useQuery({
@@ -68,22 +96,36 @@ function AdminVerifyPage() {
     },
   });
 
-  // Pending creators queue query
-  const pendingCreatorsQuery = useQuery({
-    queryKey: ["admin-pending-creators"],
+  // Creators queue query (with status filter support)
+  const creatorsQuery = useQuery({
+    queryKey: ["admin-creators", creatorStatusFilter],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("creators")
-        .select("*")
-        .eq("verification_status", "pending")
-        .order("created_at", { ascending: true });
+      let q = supabase.from("creators").select("*").order("created_at", { ascending: false });
+      if (creatorStatusFilter === "pending") {
+        q = q.eq("verification_status", "pending");
+      } else if (creatorStatusFilter === "verified") {
+        q = q.eq("verified", true);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return data as Creator[];
     },
   });
 
   const events = pendingEventsQuery.data ?? [];
-  const creators = pendingCreatorsQuery.data ?? [];
+  const creators = creatorsQuery.data ?? [];
+
+  const selectedEvent = events.find((e) => e.id === (selectedId || events[0]?.id));
+  const selectedCreator = creators.find((c) => c.id === (selectedId || creators[0]?.id));
+
+  // Sync selectedFields when selectedCreator changes
+  useEffect(() => {
+    if (selectedCreator) {
+      setSelectedFields(selectedCreator.verified_fields ?? []);
+    } else {
+      setSelectedFields([]);
+    }
+  }, [selectedCreator?.id, selectedCreator?.verified_fields]);
 
   const handleReviewEvent = async (eventId: string, approve: boolean) => {
     try {
@@ -102,41 +144,77 @@ function AdminVerifyPage() {
     }
   };
 
-  const handleReviewCreator = async (creatorId: string, approve: boolean) => {
+  const handleSaveFields = async () => {
+    if (!selectedCreator?.id) return;
+    setSavingFields(true);
     try {
-      const status = approve ? "approved" : "rejected";
-      const { error } = await supabase
-        .from("creators")
-        .update({ verification_status: status, verified: approve })
-        .eq("id", creatorId);
+      const { error } = await supabase.rpc("set_verified_fields", {
+        _creator_id: selectedCreator.id,
+        _fields: selectedFields,
+      });
       if (error) throw error;
-
-      toast.success(approve ? "Creator verified!" : "Creator application rejected.");
-      setSelectedId(null);
-      qc.invalidateQueries({ queryKey: ["admin-pending-creators"] });
+      toast.success("Verification criteria saved!");
+      qc.invalidateQueries({ queryKey: ["admin-creators"] });
+      qc.invalidateQueries({ queryKey: ["creator-profile", selectedCreator.id] });
     } catch (err) {
       toast.error(errMsg(err));
+    } finally {
+      setSavingFields(false);
     }
   };
 
-  const selectedEvent = events.find((e) => e.id === (selectedId || events[0]?.id));
-  const selectedCreator = creators.find((c) => c.id === (selectedId || creators[0]?.id));
+  const handleReviewCreator = async (creatorId: string, approve: boolean) => {
+    setProcessingReview(true);
+    try {
+      if (approve) {
+        // First sync verified fields criteria
+        const { error: fieldsError } = await supabase.rpc("set_verified_fields", {
+          _creator_id: creatorId,
+          _fields: selectedFields,
+        });
+        if (fieldsError) throw fieldsError;
+      }
+
+      // Execute official review_creator RPC
+      const { error } = await supabase.rpc("review_creator", {
+        _creator_id: creatorId,
+        _approve: approve,
+      });
+      if (error) throw error;
+
+      toast.success(approve ? "Creator verified and granted creator role!" : "Creator application rejected.");
+      setSelectedId(null);
+      qc.invalidateQueries({ queryKey: ["admin-creators"] });
+      qc.invalidateQueries({ queryKey: ["creator-profile", creatorId] });
+      qc.invalidateQueries({ queryKey: ["admin-platform-stats"] });
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setProcessingReview(false);
+    }
+  };
+
+  const toggleFieldVerification = (key: string) => {
+    setSelectedFields((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  };
 
   return (
     <main className="px-4 py-5 md:px-6 md:py-8 pb-24 space-y-6">
       {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-border pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
         <div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">
             Verification Queue
           </h1>
           <p className="text-sm text-muted-foreground">
-            Review pending creator registrations and event submissions.
+            Review pending creator registrations, individual trust criteria, and event submissions.
           </p>
         </div>
 
         {/* Tab Selector with Badges */}
-        <div className="flex bg-muted/60 p-1 rounded-2xl border border-border">
+        <div className="flex bg-muted/60 p-1 rounded-2xl border border-border self-start">
           <button
             type="button"
             onClick={() => {
@@ -305,99 +383,311 @@ function AdminVerifyPage() {
             )}
           </div>
         )
-      ) : pendingCreatorsQuery.isLoading ? (
-        <ListSkeleton rows={3} tall />
-      ) : creators.length === 0 ? (
-        <EmptyState
-          title="No pending creator applications"
-          body="All creator verification requests have been reviewed."
-        />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Queue List */}
-          <div className="lg:col-span-5 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Pending Creators ({creators.length})
-            </p>
-            <div className="space-y-2">
-              {creators.map((c) => {
-                const active = (selectedCreator?.id ?? creators[0]?.id) === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setSelectedId(c.id)}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                      active
-                        ? "bg-card border-primary/50 ring-2 ring-primary/20 shadow-xs"
-                        : "bg-card/60 border-border hover:bg-card"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar name={c.display_name} src={c.avatar_url} size={44} />
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-sm line-clamp-1 text-foreground">
-                          {c.display_name}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">{c.category} creator</p>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+        /* Creators Queue Section */
+        <div className="space-y-4">
+          {/* Sub-filter tabs for Creators */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground font-semibold">Filter:</span>
+            {(["pending", "verified", "all"] as const).map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                onClick={() => {
+                  setCreatorStatusFilter(filter);
+                  setSelectedId(null);
+                }}
+                className={`px-3 py-1.5 rounded-full capitalize font-semibold transition-all ${
+                  creatorStatusFilter === filter
+                    ? "bg-brand text-primary-foreground shadow-brand"
+                    : "bg-muted/70 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {filter === "pending" ? "Pending Review" : filter === "verified" ? "Verified Creators" : "All Applications"}
+              </button>
+            ))}
           </div>
 
-          {/* Right Selected Creator Preview */}
-          {selectedCreator && (
-            <div className="lg:col-span-7 rounded-3xl bg-card border border-border p-6 shadow-xs space-y-6 sticky top-24">
-              <div className="flex items-center gap-4 border-b border-border pb-4">
-                <Avatar
-                  name={selectedCreator.display_name}
-                  src={selectedCreator.avatar_url}
-                  size={64}
-                />
-                <div>
-                  <h2 className="font-display text-xl font-bold">{selectedCreator.display_name}</h2>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedCreator.category} · {selectedCreator.location}
-                  </p>
+          {creatorsQuery.isLoading ? (
+            <ListSkeleton rows={3} tall />
+          ) : creators.length === 0 ? (
+            <EmptyState
+              title={
+                creatorStatusFilter === "pending"
+                  ? "No pending creator applications"
+                  : creatorStatusFilter === "verified"
+                    ? "No verified creators found"
+                    : "No creator applications recorded"
+              }
+              body={
+                creatorStatusFilter === "pending"
+                  ? "All creator verification requests have been audited."
+                  : "Try switching filter views above."
+              }
+            />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Left Queue List */}
+              <div className="lg:col-span-5 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {creatorStatusFilter === "pending" ? "Pending Applications" : "Creators"} ({creators.length})
+                </p>
+                <div className="space-y-2">
+                  {creators.map((c) => {
+                    const active = (selectedCreator?.id ?? creators[0]?.id) === c.id;
+                    const verifiedCount = c.verified_fields?.length ?? 0;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setSelectedId(c.id)}
+                        className={`w-full text-left p-4 rounded-2xl border transition-all ${
+                          active
+                            ? "bg-card border-primary/50 ring-2 ring-primary/20 shadow-xs"
+                            : "bg-card/60 border-border hover:bg-card"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar name={c.display_name} src={c.avatar_url} size={44} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <h3 className="font-semibold text-sm line-clamp-1 text-foreground flex items-center gap-1">
+                                {c.display_name}
+                                {c.verified && (
+                                  <BadgeCheck className="size-3.5 fill-primary text-primary-foreground shrink-0" />
+                                )}
+                              </h3>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  c.verification_status === "verified"
+                                    ? "bg-trust-soft text-trust"
+                                    : c.verification_status === "rejected"
+                                      ? "bg-destructive/10 text-destructive"
+                                      : "bg-warn-soft text-warn font-semibold"
+                                }`}
+                              >
+                                {c.verification_status}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{c.category} · {c.location}</p>
+                            <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-2">
+                              <span>{fmtCount(c.audience_size)} followers</span>
+                              <span>·</span>
+                              <span className="text-primary font-medium">{verifiedCount}/6 criteria verified</span>
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="space-y-3 text-xs">
-                <div>
-                  <span className="text-muted-foreground block font-semibold uppercase">Bio</span>
-                  <p className="text-sm text-foreground mt-1">
-                    {selectedCreator.bio || "No bio provided."}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block font-semibold uppercase">
-                    Stated Audience Size
-                  </span>
-                  <p className="text-sm text-foreground mt-1">
-                    {selectedCreator.audience_size} Followers
-                  </p>
-                </div>
-              </div>
+              {/* Right Selected Creator Preview & Audit Checklist */}
+              {selectedCreator && (
+                <div className="lg:col-span-7 rounded-3xl bg-card border border-border p-6 shadow-xs space-y-6 sticky top-24">
+                  {/* Creator Header */}
+                  <div className="flex items-center justify-between border-b border-border pb-4">
+                    <div className="flex items-center gap-4">
+                      <Avatar
+                        name={selectedCreator.display_name}
+                        src={selectedCreator.avatar_url}
+                        size={60}
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="font-display text-xl font-bold">{selectedCreator.display_name}</h2>
+                          {selectedCreator.verified && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-trust-soft px-2 py-0.5 text-[10px] font-bold text-trust">
+                              <ShieldCheck className="size-3" /> Verified Creator
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedCreator.category} · {selectedCreator.location}
+                        </p>
+                      </div>
+                    </div>
 
-              <div className="pt-4 border-t border-border flex items-center justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => handleReviewCreator(selectedCreator.id, false)}
-                  className="gap-1.5 rounded-xl border-destructive/40 text-destructive hover:bg-destructive/10"
-                >
-                  <X className="size-4" /> Reject Verification
-                </Button>
-                <Button
-                  variant="brand"
-                  onClick={() => handleReviewCreator(selectedCreator.id, true)}
-                  className="gap-1.5 rounded-xl shadow-brand"
-                >
-                  <ShieldCheck className="size-4" /> Approve Verified Status
-                </Button>
-              </div>
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${
+                        selectedCreator.verification_status === "verified"
+                          ? "bg-trust-soft text-trust"
+                          : selectedCreator.verification_status === "rejected"
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-warn-soft text-warn"
+                      }`}
+                    >
+                      Status: {selectedCreator.verification_status}
+                    </span>
+                  </div>
+
+                  {/* Creator Profile Metadata */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3 rounded-2xl bg-muted/30 border border-border/60">
+                      <span className="text-muted-foreground block text-[11px] font-semibold uppercase">Category</span>
+                      <span className="font-semibold text-foreground mt-0.5 block">{selectedCreator.category}</span>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-muted/30 border border-border/60">
+                      <span className="text-muted-foreground block text-[11px] font-semibold uppercase">Audience Size</span>
+                      <span className="font-semibold text-foreground mt-0.5 block">{fmtCount(selectedCreator.audience_size)} followers</span>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-muted/30 border border-border/60">
+                      <span className="text-muted-foreground block text-[11px] font-semibold uppercase">Location</span>
+                      <span className="font-semibold text-foreground mt-0.5 block">{selectedCreator.location}</span>
+                    </div>
+                  </div>
+
+                  {/* Bio */}
+                  {selectedCreator.bio && (
+                    <div className="space-y-1 text-xs">
+                      <span className="text-muted-foreground font-semibold uppercase tracking-wider block">Bio</span>
+                      <p className="text-sm text-foreground bg-muted/20 p-3 rounded-2xl border border-border/50 leading-relaxed">
+                        {selectedCreator.bio}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Portfolio & Contact Links */}
+                  <div className="space-y-2 text-xs">
+                    <span className="text-muted-foreground font-semibold uppercase tracking-wider block">
+                      Submitted Links & Contact
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCreator.contact_email && (
+                        <a
+                          href={`mailto:${selectedCreator.contact_email}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/50 border border-border hover:bg-muted text-foreground transition-colors"
+                        >
+                          <Mail className="size-3.5 text-primary" /> {selectedCreator.contact_email}
+                        </a>
+                      )}
+                      {selectedCreator.contact_phone && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/50 border border-border text-foreground">
+                          <Phone className="size-3.5 text-primary" /> {selectedCreator.contact_phone}
+                        </span>
+                      )}
+                      {(selectedCreator.portfolio_links ?? []).map((link, idx) => (
+                        <a
+                          key={idx}
+                          href={link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/50 border border-border hover:bg-muted text-primary transition-colors font-medium"
+                        >
+                          <ExternalLink className="size-3.5" /> {link.replace(/^https?:\/\/(www\.)?/, "").slice(0, 30)}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Individual Verification Criteria Checklist */}
+                  <div className="space-y-3 pt-4 border-t border-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
+                          <ShieldCheck className="size-4 text-primary" /> Individual Verification Criteria
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          Audit and confirm each criteria based on official documentation.
+                        </p>
+                      </div>
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                        {selectedFields.length} of {VERIFIABLE_FIELDS.length} verified
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {VERIFIABLE_FIELDS.map((vf) => {
+                        const isChecked = selectedFields.includes(vf.key);
+                        return (
+                          <label
+                            key={vf.key}
+                            className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                              isChecked
+                                ? "bg-trust-soft/30 border-trust/50 shadow-xs"
+                                : "bg-muted/30 border-border hover:bg-muted/60"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleFieldVerification(vf.key)}
+                              className="mt-0.5 size-4 rounded border-border text-trust focus:ring-trust cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                  {vf.label}
+                                  {isChecked && <CheckCircle2 className="size-3 text-trust" />}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                    isChecked
+                                      ? "bg-trust-soft text-trust"
+                                      : "bg-muted text-muted-foreground"
+                                  }`}
+                                >
+                                  {isChecked ? "Verified" : "Pending Audit"}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-snug">
+                                {vf.criteria}
+                              </p>
+                              <div className="text-[11px] text-foreground font-medium bg-background/80 px-2 py-1 rounded-lg border border-border/60 inline-block">
+                                {vf.key === "name" && `Submitted: ${selectedCreator.display_name}`}
+                                {vf.key === "niche" && `Category: ${selectedCreator.category}`}
+                                {vf.key === "audience" && `Audience: ${fmtCount(selectedCreator.audience_size)} followers`}
+                                {vf.key === "location" && `Location: ${selectedCreator.location}`}
+                                {vf.key === "portfolio" &&
+                                  (selectedCreator.portfolio_links?.length
+                                    ? `${selectedCreator.portfolio_links.length} link(s) provided`
+                                    : "No portfolio links submitted")}
+                                {vf.key === "contact" &&
+                                  `Email: ${selectedCreator.contact_email || "N/A"} · Phone: ${selectedCreator.contact_phone || "N/A"}`}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Action Bar */}
+                  <div className="pt-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSaveFields}
+                      disabled={savingFields || processingReview}
+                      className="rounded-xl text-xs font-semibold gap-1.5 w-full sm:w-auto"
+                    >
+                      <Save className="size-3.5" />
+                      {savingFields ? "Saving..." : "Save Verified Criteria"}
+                    </Button>
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleReviewCreator(selectedCreator.id, false)}
+                        disabled={processingReview || savingFields}
+                        className="gap-1.5 rounded-xl border-destructive/40 text-destructive hover:bg-destructive/10 text-xs font-semibold flex-1 sm:flex-initial"
+                      >
+                        <X className="size-4" /> Reject Application
+                      </Button>
+                      <Button
+                        variant="brand"
+                        onClick={() => handleReviewCreator(selectedCreator.id, true)}
+                        disabled={processingReview || savingFields}
+                        className="gap-1.5 rounded-xl shadow-brand text-xs font-semibold flex-1 sm:flex-initial"
+                      >
+                        <ShieldCheck className="size-4" />
+                        {processingReview ? "Processing..." : "Approve & Verify Creator"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

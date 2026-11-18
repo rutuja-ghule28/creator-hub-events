@@ -24,7 +24,7 @@ function NotFoundComponent() {
         <p className="mt-2 text-sm text-muted-foreground">This page doesn't exist or has moved.</p>
         <div className="mt-6">
           <Link
-            to="/discover"
+            to="/discover/1"
             className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
           >
             Go to Discover
@@ -58,7 +58,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
             Try again
           </button>
           <a
-            href="/discover"
+            href="/discover/1"
             className="inline-flex min-h-11 items-center justify-center rounded-xl border bg-card px-5 text-sm font-semibold text-foreground transition hover:bg-muted"
           >
             Go to Discover
@@ -162,7 +162,7 @@ const jsonLdSchema = {
       },
       potentialAction: {
         "@type": "SearchAction",
-        target: "https://creatorconnect.app/discover?q={search_term_string}",
+        target: "https://creatorconnect.app/discover/1?q={search_term_string}",
         "query-input": "required name=search_term_string",
       },
     },

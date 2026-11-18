@@ -16,11 +16,14 @@ import {
   Flag,
   BarChart3,
   Search,
+  Users,
+  Check,
+  ArrowRight,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { fmtDateTime, seatsLeft, type Creator, type EventWithCreator, type Me } from "@/lib/cc";
+import { fmtDateTime, fmtCount, seatsLeft, type Creator, type EventWithCreator, type Me } from "@/lib/cc";
 
 /* ---------- Generated SVG cover ---------- */
 const PALETTES = [
@@ -252,6 +255,74 @@ export function EventRowCompact({ e, right }: { e: EventWithCreator; right?: Rea
   );
 }
 
+export function CreatorCard({ c }: { c: Creator }) {
+  const verifiedCount = c.verified_fields?.length ?? 0;
+  return (
+    <Link
+      to="/creator/$id"
+      params={{ id: c.id }}
+      className="group flex flex-col rounded-3xl bg-card border border-border overflow-hidden shadow-xs hover:shadow-md hover:border-primary/50 transition-all text-left"
+    >
+      {/* Top Banner Gradient */}
+      <div className="h-24 bg-gradient-to-r from-brand via-primary to-purple-600 relative p-3.5 flex justify-between items-start">
+        <span className="bg-black/25 backdrop-blur-md text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-white/20">
+          {c.category}
+        </span>
+        {c.verified && (
+          <span className="inline-flex items-center gap-1 bg-trust text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+            <BadgeCheck className="size-3" /> Verified
+          </span>
+        )}
+      </div>
+
+      {/* Avatar & Content */}
+      <div className="p-5 pt-0 relative flex-1 flex flex-col justify-between space-y-3">
+        <div className="-mt-8 flex items-end justify-between">
+          <div className="ring-4 ring-card rounded-full overflow-hidden shrink-0 shadow-md bg-card">
+            <Avatar name={c.display_name} src={c.avatar_url} size={56} />
+          </div>
+          <span className="text-xs font-bold text-foreground flex items-center gap-1 bg-muted/70 px-2.5 py-1 rounded-xl">
+            <Users className="size-3 text-primary" /> {fmtCount(c.audience_size || 0)}
+          </span>
+        </div>
+
+        <div>
+          <h3 className="font-display font-bold text-base text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5 line-clamp-1">
+            {c.display_name}
+            {c.verified && (
+              <BadgeCheck className="size-4 fill-primary text-primary-foreground shrink-0" />
+            )}
+          </h3>
+          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+            <MapPin className="size-3 text-primary" /> {c.location || "Pune, India"}
+          </p>
+          {c.bio && (
+            <p className="text-xs text-muted-foreground mt-2 line-clamp-2 leading-relaxed">
+              {c.bio}
+            </p>
+          )}
+        </div>
+
+        <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
+          <span className="text-[11px] text-muted-foreground font-medium">
+            {verifiedCount > 0 ? (
+              <span className="text-trust font-semibold flex items-center gap-1">
+                <Check className="size-3" /> {verifiedCount}/6 verified
+              </span>
+            ) : (
+              "Self-reported profile"
+            )}
+          </span>
+
+          <span className="text-primary font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+            View Profile <ArrowRight className="size-3" />
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 /* ---------- States ---------- */
 export function ListSkeleton({ rows = 4, tall }: { rows?: number; tall?: boolean }) {
   return (
@@ -416,7 +487,7 @@ export function DesktopSidebar({ me }: { me?: Me | null | undefined }) {
   const isAdmin = me?.roles?.includes("admin");
 
   const attendeeNav = [
-    { to: "/discover", label: "Discover", icon: Compass },
+    { to: "/discover/1", label: "Discover", icon: Compass },
     { to: "/tickets", label: "My Tickets", icon: Ticket },
     { to: "/saved", label: "Saved Events", icon: Bookmark },
     { to: "/notifications", label: "Notifications", icon: Bell },
@@ -447,7 +518,7 @@ export function DesktopSidebar({ me }: { me?: Me | null | undefined }) {
       {/* Brand Header */}
       <div className="h-16 flex items-center px-3 lg:px-6 border-b border-border">
         <Link
-          to="/discover"
+          to="/discover/1"
           className="flex items-center gap-3 group rounded-xl p-1 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <img
@@ -606,7 +677,7 @@ export function DesktopHeader({
     if (onSearchSubmit) {
       onSearchSubmit(e);
     } else if (localQ.trim()) {
-      router.navigate({ to: "/discover" });
+      router.navigate({ to: "/discover/1" });
     }
   };
 
