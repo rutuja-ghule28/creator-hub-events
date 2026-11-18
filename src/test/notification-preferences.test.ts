@@ -8,10 +8,7 @@ interface NotificationPref {
   email: boolean;
 }
 
-function resolvePreferences(
-  userId: string,
-  savedPrefs: NotificationPref[],
-) {
+function resolvePreferences(userId: string, savedPrefs: NotificationPref[]) {
   const map = new Map<string, { in_app: boolean; email: boolean }>();
 
   // Default values: in_app = true, email = false

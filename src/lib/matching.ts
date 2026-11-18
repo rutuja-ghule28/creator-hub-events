@@ -63,7 +63,10 @@ function extractCity(str: string | null | undefined): string | null {
  * 4. Verification & Trust:      15 points
  */
 export function calculateMatchScore(
-  event: Pick<EventRow, "target_niche" | "type" | "title" | "venue" | "area" | "capacity" | "description">,
+  event: Pick<
+    EventRow,
+    "target_niche" | "type" | "title" | "venue" | "area" | "capacity" | "description"
+  >,
   creator: Creator,
 ): CreatorMatchResult {
   // 1. NICHE ALIGNMENT (Max 40 points)

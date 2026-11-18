@@ -23,7 +23,7 @@ function validateCampaignReport(input: CampaignReportInput) {
     return { valid: false, error: "Engagement must be a non-negative integer." };
   }
 
-  if (!VALID_STATUSES.includes(input.deliverable_status as typeof VALID_STATUSES[number])) {
+  if (!VALID_STATUSES.includes(input.deliverable_status as (typeof VALID_STATUSES)[number])) {
     return { valid: false, error: "Invalid deliverable status." };
   }
 
@@ -44,7 +44,8 @@ function computeCampaignMetrics(
 ) {
   const totalReach = reports.reduce((acc, r) => acc + r.reach, 0);
   const totalEngagement = reports.reduce((acc, r) => acc + r.engagement, 0);
-  const engagementRate = totalReach > 0 ? ((totalEngagement / totalReach) * 100).toFixed(2) : "0.00";
+  const engagementRate =
+    totalReach > 0 ? ((totalEngagement / totalReach) * 100).toFixed(2) : "0.00";
   const deliveredCount = reports.filter((r) => r.deliverable_status === "delivered").length;
   const inProgressCount = reports.filter((r) => r.deliverable_status === "in_progress").length;
 
@@ -164,20 +165,22 @@ describe("Campaign Reporting Workflow", () => {
   });
 
   it("handles zero reach without dividing by zero", () => {
-    const metrics = computeCampaignMetrics([{ reach: 0, engagement: 0, deliverable_status: "not_started" }]);
+    const metrics = computeCampaignMetrics([
+      { reach: 0, engagement: 0, deliverable_status: "not_started" },
+    ]);
     expect(metrics.totalReach).toBe(0);
     expect(metrics.engagementRate).toBe("0.00%");
   });
 
   it("formats CSV rows with proper quote escaping", () => {
-    const csv = generateCsvRows("Tech \"Unplugged\" 2026", [
+    const csv = generateCsvRows('Tech "Unplugged" 2026', [
       {
         creatorName: "Maya Lin, Tech",
         category: "Tech reviewer",
         reach: 25000,
         engagement: 1250,
         status: "delivered",
-        notes: "Posted video: \"Must attend!\", high traffic.",
+        notes: 'Posted video: "Must attend!", high traffic.',
       },
     ]);
 

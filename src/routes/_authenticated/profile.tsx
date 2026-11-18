@@ -127,8 +127,8 @@ function ProfilePage() {
     }
 
     const row = prefsQuery.data?.find((p) => p.kind === kind);
-    const nextInApp = channel === "in_app" ? !currentVal : (row ? row.in_app : true);
-    const nextEmail = channel === "email" ? !currentVal : (row ? row.email : false);
+    const nextInApp = channel === "in_app" ? !currentVal : row ? row.in_app : true;
+    const nextEmail = channel === "email" ? !currentVal : row ? row.email : false;
     const key = `${kind}-${channel}`;
 
     setSavingChannel(key);
@@ -327,7 +327,9 @@ function ProfilePage() {
     const urlRegex = /^https?:\/\/.+/i;
     const validLinks = rawLinks.filter((l) => urlRegex.test(l));
     if (validLinks.length === 0) {
-      toast.error("Please provide at least one valid portfolio link (starting with http:// or https://).");
+      toast.error(
+        "Please provide at least one valid portfolio link (starting with http:// or https://).",
+      );
       return;
     }
 
@@ -548,9 +550,7 @@ function ProfilePage() {
                       <p className="text-sm font-semibold text-destructive">
                         Failed to load your notification preferences
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {errMsg(prefsQuery.error)}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{errMsg(prefsQuery.error)}</p>
                     </div>
                     <Button
                       size="sm"
@@ -575,7 +575,8 @@ function ProfilePage() {
                             <p className="font-semibold text-sm">Email Notifications</p>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Receive ticket confirmations, event reminders, and campaign updates via email.
+                            Receive ticket confirmations, event reminders, and campaign updates via
+                            email.
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -599,7 +600,8 @@ function ProfilePage() {
                             <p className="font-semibold text-sm">In-App Push Alerts</p>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Get real-time updates when creators post new announcements or review applications.
+                            Get real-time updates when creators post new announcements or review
+                            applications.
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -760,13 +762,17 @@ function ProfilePage() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Your creator application has been received and is waiting for review by platform administrators. Once reviewed, you will be notified and your creator role will be activated.
+                        Your creator application has been received and is waiting for review by
+                        platform administrators. Once reviewed, you will be notified and your
+                        creator role will be activated.
                       </p>
 
                       <div className="rounded-xl bg-card/70 border border-border p-4 space-y-2.5 text-xs">
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Creator Name:</span>
-                          <span className="font-semibold text-foreground">{me.creator.display_name}</span>
+                          <span className="font-semibold text-foreground">
+                            {me.creator.display_name}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Primary Niche:</span>
@@ -778,15 +784,21 @@ function ProfilePage() {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Audience Reach:</span>
-                          <span className="font-medium text-foreground">{fmtCount(me.creator.audience_size)} followers</span>
+                          <span className="font-medium text-foreground">
+                            {fmtCount(me.creator.audience_size)} followers
+                          </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Contact Email:</span>
-                          <span className="font-medium text-foreground">{me.creator.contact_email || me.email}</span>
+                          <span className="font-medium text-foreground">
+                            {me.creator.contact_email || me.email}
+                          </span>
                         </div>
                         {me.creator.portfolio_links?.length > 0 && (
                           <div className="pt-2 border-t border-border/60">
-                            <span className="text-muted-foreground block mb-1.5 font-medium">Submitted Portfolio Links:</span>
+                            <span className="text-muted-foreground block mb-1.5 font-medium">
+                              Submitted Portfolio Links:
+                            </span>
                             <div className="flex flex-wrap gap-2">
                               {me.creator.portfolio_links.map((link, idx) => (
                                 <a
@@ -797,7 +809,9 @@ function ProfilePage() {
                                   className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline bg-muted/60 px-2.5 py-1 rounded-md"
                                 >
                                   <ExternalLink className="size-3" />
-                                  <span className="max-w-[220px] truncate">{link.replace(/^https?:\/\//i, "")}</span>
+                                  <span className="max-w-[220px] truncate">
+                                    {link.replace(/^https?:\/\//i, "")}
+                                  </span>
                                 </a>
                               ))}
                             </div>
@@ -807,7 +821,10 @@ function ProfilePage() {
 
                       <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-1">
                         <Shield className="size-3.5 text-amber-500" />
-                        <span>Duplicate applications are prevented while your application is under review.</span>
+                        <span>
+                          Duplicate applications are prevented while your application is under
+                          review.
+                        </span>
                       </div>
                     </div>
                   ) : me.creator.verification_status === "verified" ? (
@@ -822,7 +839,8 @@ function ProfilePage() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        You are an approved creator on CreatorConnect! You can publish meetups, host ticketed workshops, run campaigns, and view attendee analytics.
+                        You are an approved creator on CreatorConnect! You can publish meetups, host
+                        ticketed workshops, run campaigns, and view attendee analytics.
                       </p>
 
                       <div className="flex flex-wrap items-center gap-2.5 pt-2">
@@ -859,7 +877,8 @@ function ProfilePage() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Your previous creator application was not approved during review. You may re-apply with updated links and credentials.
+                        Your previous creator application was not approved during review. You may
+                        re-apply with updated links and credentials.
                       </p>
                       <Button
                         variant="brand"
@@ -904,7 +923,8 @@ function ProfilePage() {
               Apply for Creator Status
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Submit your creator details for review. Once verified, you will be able to publish public events, collaborate with event organizers, and issue tickets.
+              Submit your creator details for review. Once verified, you will be able to publish
+              public events, collaborate with event organizers, and issue tickets.
             </DialogDescription>
           </DialogHeader>
 
@@ -934,7 +954,20 @@ function ProfilePage() {
                   className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   required
                 >
-                  {["Artist", "Musician", "Tech reviewer", "Fitness", "Food", "Comedian", "Actor", "Influencer", "Gaming", "Education", "Design", "Business"].map((cat) => (
+                  {[
+                    "Artist",
+                    "Musician",
+                    "Tech reviewer",
+                    "Fitness",
+                    "Food",
+                    "Comedian",
+                    "Actor",
+                    "Influencer",
+                    "Gaming",
+                    "Education",
+                    "Design",
+                    "Business",
+                  ].map((cat) => (
                     <option key={cat} value={cat}>
                       {cat}
                     </option>
@@ -1028,7 +1061,8 @@ function ProfilePage() {
                 required
               />
               <p className="text-[11px] text-muted-foreground">
-                Enter at least 1 valid URL starting with http:// or https:// (one per line or comma-separated).
+                Enter at least 1 valid URL starting with http:// or https:// (one per line or
+                comma-separated).
               </p>
             </div>
 

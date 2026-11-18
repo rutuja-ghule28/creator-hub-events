@@ -35,7 +35,10 @@ function validateCreatorApplication(
     return { valid: false, error: "Bio must be at least 10 characters long." };
   }
 
-  const aud = typeof input.audience_size === "string" ? parseInt(input.audience_size, 10) : input.audience_size;
+  const aud =
+    typeof input.audience_size === "string"
+      ? parseInt(input.audience_size, 10)
+      : input.audience_size;
   if (isNaN(aud) || aud < 0) {
     return { valid: false, error: "Audience size must be a non-negative number." };
   }
@@ -48,7 +51,11 @@ function validateCreatorApplication(
   const urlRegex = /^https?:\/\/.+/i;
   const validUrls = input.portfolio_links.filter((l) => urlRegex.test(l.trim()));
   if (validUrls.length === 0) {
-    return { valid: false, error: "Please provide at least one valid portfolio link (starting with http:// or https://)." };
+    return {
+      valid: false,
+      error:
+        "Please provide at least one valid portfolio link (starting with http:// or https://).",
+    };
   }
 
   return {
@@ -115,13 +122,19 @@ describe("Creator Onboarding Workflow", () => {
   });
 
   it("validates email address format", () => {
-    const res = validateCreatorApplication({ ...validPayload, contact_email: "invalid-email" }, null);
+    const res = validateCreatorApplication(
+      { ...validPayload, contact_email: "invalid-email" },
+      null,
+    );
     expect(res.valid).toBe(false);
     expect(res.error).toMatch(/valid contact email/i);
   });
 
   it("requires at least one valid http/https portfolio link", () => {
-    const res = validateCreatorApplication({ ...validPayload, portfolio_links: ["not-a-url", "ftp://invalid"] }, null);
+    const res = validateCreatorApplication(
+      { ...validPayload, portfolio_links: ["not-a-url", "ftp://invalid"] },
+      null,
+    );
     expect(res.valid).toBe(false);
     expect(res.error).toMatch(/at least one valid portfolio link/i);
   });

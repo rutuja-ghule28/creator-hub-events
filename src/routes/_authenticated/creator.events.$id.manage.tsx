@@ -141,10 +141,13 @@ function ManageEventPage() {
 
   // Campaign Report modal state
   const [reportModalOpen, setReportModalOpen] = useState(false);
-  const [selectedAppForReport, setSelectedAppForReport] = useState<CampaignApplicationWithCreator | null>(null);
+  const [selectedAppForReport, setSelectedAppForReport] =
+    useState<CampaignApplicationWithCreator | null>(null);
   const [reportReach, setReportReach] = useState("");
   const [reportEngagement, setReportEngagement] = useState("");
-  const [reportDeliverableStatus, setReportDeliverableStatus] = useState<"not_started" | "in_progress" | "delivered">("delivered");
+  const [reportDeliverableStatus, setReportDeliverableStatus] = useState<
+    "not_started" | "in_progress" | "delivered"
+  >("delivered");
   const [reportNotes, setReportNotes] = useState("");
   const [savingReport, setSavingReport] = useState(false);
 
@@ -169,8 +172,9 @@ function ManageEventPage() {
 
       const ranked = rankCreatorsForEvent(eventQuery.data, (allCreators ?? []) as Creator[], 5);
       setRecommendedMatches(ranked);
-      if (ranked.length > 0) {
-        setExpandedMatchId(ranked[0].creator.id);
+      const firstMatch = ranked[0];
+      if (firstMatch) {
+        setExpandedMatchId(firstMatch.creator.id);
       }
     } catch (err) {
       toast.error(errMsg(err));
@@ -430,6 +434,14 @@ function ManageEventPage() {
   const allApps = applicationsQuery.data ?? [];
   const pendingAppsCount = allApps.filter((a) => a.status === "pending").length;
   const filteredApps = allApps.filter((a) => (appFilter === "all" ? true : a.status === appFilter));
+  const acceptedApps = allApps.filter((a) => a.status === "accepted");
+  const totalReach = acceptedApps.reduce((acc, a) => acc + (a.report?.reach ?? 0), 0);
+  const totalEngagement = acceptedApps.reduce((acc, a) => acc + (a.report?.engagement ?? 0), 0);
+  const avgEngagementRate =
+    totalReach > 0 ? ((totalEngagement / totalReach) * 100).toFixed(2) : "0.00";
+  const deliveredCount = acceptedApps.filter(
+    (a) => a.report?.deliverable_status === "delivered",
+  ).length;
 
   const checkedInCount = (attendeesQuery.data ?? []).filter((a) => a.checked_in).length;
 
@@ -498,9 +510,7 @@ function ManageEventPage() {
               </p>
             </div>
             <div className="space-y-0.5">
-              <p className="text-xs text-muted-foreground uppercase font-semibold">
-                Applications
-              </p>
+              <p className="text-xs text-muted-foreground uppercase font-semibold">Applications</p>
               <p className="font-display text-xl font-bold text-foreground">
                 {allApps.length} Pitches
               </p>
@@ -720,7 +730,8 @@ function ManageEventPage() {
                   <Megaphone className="size-3.5" /> Promotion Brief for this Event
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  Target Niche: <strong className="text-foreground">{ev.target_niche || "All Categories"}</strong>
+                  Target Niche:{" "}
+                  <strong className="text-foreground">{ev.target_niche || "All Categories"}</strong>
                 </span>
               </div>
               <p className="text-sm text-foreground leading-relaxed">{ev.promotion_brief}</p>
@@ -909,7 +920,8 @@ function ManageEventPage() {
                         {app.report && (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-trust/10 text-trust text-[11px] font-semibold border border-trust/20">
                             <TrendingUp className="size-3" />
-                            {fmtCount(app.report.reach)} reach · {app.report.deliverable_status.replace("_", " ")}
+                            {fmtCount(app.report.reach)} reach ·{" "}
+                            {app.report.deliverable_status.replace("_", " ")}
                           </span>
                         )}
                         <Button
@@ -966,7 +978,8 @@ function ManageEventPage() {
                   <BarChart3 className="size-5 text-primary" /> Post-Event Campaign Reports
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Track audience reach, guest engagement, and confirmed deliverables across collaborating creators.
+                  Track audience reach, guest engagement, and confirmed deliverables across
+                  collaborating creators.
                 </p>
               </div>
 
@@ -1011,16 +1024,16 @@ function ManageEventPage() {
                 <p className="font-display text-2xl font-bold text-primary">
                   {fmtCount(totalEngagement)}
                 </p>
-                <p className="text-[11px] text-muted-foreground">Clicks, likes, shares & comments</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Clicks, likes, shares & comments
+                </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-1">
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                   Avg Engagement Rate
                 </span>
-                <p className="font-display text-2xl font-bold text-trust">
-                  {avgEngagementRate}%
-                </p>
+                <p className="font-display text-2xl font-bold text-trust">{avgEngagementRate}%</p>
                 <p className="text-[11px] text-muted-foreground">Interactions over total reach</p>
               </div>
 
@@ -1089,7 +1102,8 @@ function ManageEventPage() {
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Audience base: {fmtCount(app.creator?.audience_size || 0)} followers · {app.creator?.location}
+                            Audience base: {fmtCount(app.creator?.audience_size || 0)} followers ·{" "}
+                            {app.creator?.location}
                           </p>
                         </div>
                       </div>
@@ -1156,7 +1170,9 @@ function ManageEventPage() {
                     {/* Deliverable Notes */}
                     {rep?.notes && (
                       <div className="text-xs space-y-1">
-                        <span className="font-semibold text-muted-foreground">Deliverable Notes & Proof URLs:</span>
+                        <span className="font-semibold text-muted-foreground">
+                          Deliverable Notes & Proof URLs:
+                        </span>
                         <p className="p-3 bg-muted/20 rounded-xl border border-border/50 text-foreground whitespace-pre-line">
                           {rep.notes}
                         </p>
@@ -1175,11 +1191,16 @@ function ManageEventPage() {
         <DialogContent className="max-w-md rounded-3xl p-6">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold font-display">
-              {selectedAppForReport?.report ? "Update Campaign Report" : "Log Post-Event Campaign Metrics"}
+              {selectedAppForReport?.report
+                ? "Update Campaign Report"
+                : "Log Post-Event Campaign Metrics"}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               Record verified reach, audience interactions, and deliverable status for{" "}
-              <strong className="text-foreground">{selectedAppForReport?.creator?.display_name}</strong>.
+              <strong className="text-foreground">
+                {selectedAppForReport?.creator?.display_name}
+              </strong>
+              .
             </DialogDescription>
           </DialogHeader>
 
@@ -1204,7 +1225,8 @@ function ManageEventPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="rep-eng">
-                Total Engagement (Clicks, Likes, Comments) <span className="text-destructive">*</span>
+                Total Engagement (Clicks, Likes, Comments){" "}
+                <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="rep-eng"
@@ -1228,7 +1250,9 @@ function ManageEventPage() {
                 id="rep-status"
                 value={reportDeliverableStatus}
                 onChange={(e) =>
-                  setReportDeliverableStatus(e.target.value as "not_started" | "in_progress" | "delivered")
+                  setReportDeliverableStatus(
+                    e.target.value as "not_started" | "in_progress" | "delivered",
+                  )
                 }
                 className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
@@ -1319,13 +1343,17 @@ function ManageEventPage() {
           </div>
           <div>
             <p className="text-xs text-neutral-500 font-semibold uppercase">Deliverables</p>
-            <p className="text-xl font-bold">{deliveredCount} / {acceptedApps.length} Delivered</p>
+            <p className="text-xl font-bold">
+              {deliveredCount} / {acceptedApps.length} Delivered
+            </p>
           </div>
         </div>
 
         {/* Deliverables Table */}
         <div className="space-y-2">
-          <h3 className="text-sm font-bold uppercase tracking-wider">Creator Deliverable Breakdown</h3>
+          <h3 className="text-sm font-bold uppercase tracking-wider">
+            Creator Deliverable Breakdown
+          </h3>
           <table className="w-full border-collapse border border-neutral-300 text-xs">
             <thead>
               <tr className="bg-neutral-100">
@@ -1346,15 +1374,25 @@ function ManageEventPage() {
                 const rate = r > 0 ? ((eng / r) * 100).toFixed(1) : "0.0";
                 return (
                   <tr key={a.id}>
-                    <td className="border border-neutral-300 p-2 font-semibold">{a.creator?.display_name || "Unknown"}</td>
+                    <td className="border border-neutral-300 p-2 font-semibold">
+                      {a.creator?.display_name || "Unknown"}
+                    </td>
                     <td className="border border-neutral-300 p-2">{a.creator?.category}</td>
-                    <td className="border border-neutral-300 p-2 text-right font-medium">{fmtCount(r)}</td>
-                    <td className="border border-neutral-300 p-2 text-right font-medium">{fmtCount(eng)}</td>
-                    <td className="border border-neutral-300 p-2 text-right font-medium">{rate}%</td>
+                    <td className="border border-neutral-300 p-2 text-right font-medium">
+                      {fmtCount(r)}
+                    </td>
+                    <td className="border border-neutral-300 p-2 text-right font-medium">
+                      {fmtCount(eng)}
+                    </td>
+                    <td className="border border-neutral-300 p-2 text-right font-medium">
+                      {rate}%
+                    </td>
                     <td className="border border-neutral-300 p-2 text-center uppercase font-bold text-[10px]">
                       {rep?.deliverable_status ?? "not_started"}
                     </td>
-                    <td className="border border-neutral-300 p-2 text-neutral-700">{rep?.notes || "—"}</td>
+                    <td className="border border-neutral-300 p-2 text-neutral-700">
+                      {rep?.notes || "—"}
+                    </td>
                   </tr>
                 );
               })}
@@ -1378,21 +1416,29 @@ function ManageEventPage() {
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs text-muted-foreground">
-              Top 5 creator recommendations for <strong className="text-foreground">{ev?.title}</strong> based on target niche, geographic proximity, capacity ratio, and trust verification.
+              Top 5 creator recommendations for{" "}
+              <strong className="text-foreground">{ev?.title}</strong> based on target niche,
+              geographic proximity, capacity ratio, and trust verification.
             </DialogDescription>
           </DialogHeader>
 
           {matchingLoading ? (
             <div className="py-12 text-center space-y-3">
               <Loader2 className="size-8 animate-spin text-primary mx-auto" />
-              <p className="text-sm font-semibold">Analyzing creator profiles against event criteria...</p>
-              <p className="text-xs text-muted-foreground">Evaluating niche alignment, location proximity, and audience fit.</p>
+              <p className="text-sm font-semibold">
+                Analyzing creator profiles against event criteria...
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Evaluating niche alignment, location proximity, and audience fit.
+              </p>
             </div>
           ) : recommendedMatches.length === 0 ? (
             <div className="py-8 text-center space-y-2">
               <AlertCircle className="size-8 text-muted-foreground mx-auto" />
               <p className="text-sm font-semibold">No creators found to match</p>
-              <p className="text-xs text-muted-foreground">Check back when more creators join CreatorConnect.</p>
+              <p className="text-xs text-muted-foreground">
+                Check back when more creators join CreatorConnect.
+              </p>
             </div>
           ) : (
             <div className="space-y-4 pt-2">
@@ -1400,7 +1446,9 @@ function ManageEventPage() {
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Target className="size-4 text-primary shrink-0" />
                   <span>
-                    Matching Event: <strong className="text-foreground">{ev?.target_niche || "All Niches"}</strong> · {ev?.venue} · {ev?.capacity} Seats
+                    Matching Event:{" "}
+                    <strong className="text-foreground">{ev?.target_niche || "All Niches"}</strong>{" "}
+                    · {ev?.venue} · {ev?.capacity} Seats
                   </span>
                 </div>
                 <span className="text-[11px] font-semibold text-primary px-2 py-0.5 rounded-full bg-brand/10">
@@ -1431,14 +1479,19 @@ function ManageEventPage() {
                           <Avatar name={creator.display_name} src={creator.avatar_url} size={42} />
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-sm text-foreground">{creator.display_name}</span>
+                              <span className="font-bold text-sm text-foreground">
+                                {creator.display_name}
+                              </span>
                               {creator.verified && (
                                 <BadgeCheck className="size-4 fill-primary text-primary-foreground" />
                               )}
-                              <span className="text-xs text-muted-foreground">· {creator.category}</span>
+                              <span className="text-xs text-muted-foreground">
+                                · {creator.category}
+                              </span>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              {creator.location || "Location not stated"} · {fmtCount(creator.audience_size || 0)} followers
+                              {creator.location || "Location not stated"} ·{" "}
+                              {fmtCount(creator.audience_size || 0)} followers
                             </p>
                           </div>
                         </div>
@@ -1466,7 +1519,11 @@ function ManageEventPage() {
                             className="h-8 px-2 text-xs rounded-xl text-muted-foreground hover:text-foreground"
                           >
                             <span>Breakdown</span>
-                            {isExpanded ? <ChevronUp className="size-3.5 ml-1" /> : <ChevronDown className="size-3.5 ml-1" />}
+                            {isExpanded ? (
+                              <ChevronUp className="size-3.5 ml-1" />
+                            ) : (
+                              <ChevronDown className="size-3.5 ml-1" />
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -1483,7 +1540,9 @@ function ManageEventPage() {
                                   {breakdown.nicheScore} / {breakdown.nicheMax} pts
                                 </span>
                               </div>
-                              <p className="text-[11px] text-muted-foreground">{breakdown.nicheReason}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {breakdown.nicheReason}
+                              </p>
                             </div>
 
                             {/* Location */}
@@ -1494,7 +1553,9 @@ function ManageEventPage() {
                                   {breakdown.locationScore} / {breakdown.locationMax} pts
                                 </span>
                               </div>
-                              <p className="text-[11px] text-muted-foreground">{breakdown.locationReason}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {breakdown.locationReason}
+                              </p>
                             </div>
 
                             {/* Audience */}
@@ -1505,7 +1566,9 @@ function ManageEventPage() {
                                   {breakdown.audienceScore} / {breakdown.audienceMax} pts
                                 </span>
                               </div>
-                              <p className="text-[11px] text-muted-foreground">{breakdown.audienceReason}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {breakdown.audienceReason}
+                              </p>
                             </div>
 
                             {/* Trust */}
@@ -1516,13 +1579,16 @@ function ManageEventPage() {
                                   {breakdown.trustScore} / {breakdown.trustMax} pts
                                 </span>
                               </div>
-                              <p className="text-[11px] text-muted-foreground">{breakdown.trustReason}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {breakdown.trustReason}
+                              </p>
                             </div>
                           </div>
 
                           <div className="flex items-center justify-between pt-2">
                             <p className="text-[11px] text-muted-foreground italic">
-                              Bio: {creator.bio ? `"${creator.bio.slice(0, 90)}..."` : "No bio provided"}
+                              Bio:{" "}
+                              {creator.bio ? `"${creator.bio.slice(0, 90)}..."` : "No bio provided"}
                             </p>
                             <Link
                               to="/creator/$id"
@@ -1544,7 +1610,10 @@ function ManageEventPage() {
               <div className="rounded-xl border border-border/70 p-3 bg-muted/40 text-[11px] text-muted-foreground space-y-0.5">
                 <p className="font-semibold text-foreground">AI-Assisted Recommendation MVP</p>
                 <p>
-                  Compatibility scores are computed using a transparent weighted scoring algorithm evaluating target niche affinity (40%), location proximity (25%), capacity-to-reach ratio (20%), and trust verification (15%). No trained ML model is utilized.
+                  Compatibility scores are computed using a transparent weighted scoring algorithm
+                  evaluating target niche affinity (40%), location proximity (25%),
+                  capacity-to-reach ratio (20%), and trust verification (15%). No trained ML model
+                  is utilized.
                 </p>
               </div>
             </div>

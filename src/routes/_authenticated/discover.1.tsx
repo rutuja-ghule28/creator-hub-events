@@ -16,7 +16,15 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { EVENT_SELECT, EVENT_TYPES, NICHES, errMsg, useMe, type Creator, type EventWithCreator } from "@/lib/cc";
+import {
+  EVENT_SELECT,
+  EVENT_TYPES,
+  NICHES,
+  errMsg,
+  useMe,
+  type Creator,
+  type EventWithCreator,
+} from "@/lib/cc";
 import {
   Chip,
   CreatorCard,
@@ -24,14 +32,19 @@ import {
   ErrorState,
   EventCardLarge,
   ListSkeleton,
+  ExternalEventCardLarge,
+  ExternalRedirectDialog,
+  CityFilterBar,
 } from "@/components/cc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { type ExternalEvent, MAJOR_INDIAN_CITIES } from "@/lib/external-events";
 
 type DiscoverSearch = {
-  tab?: "events" | "creators";
-  q?: string;
-  scope?: "upcoming" | "past";
+  tab?: "events" | "creators" | undefined;
+  q?: string | undefined;
+  scope?: "upcoming" | "past" | undefined;
+  city?: string | undefined;
 };
 
 export const Route = createFileRoute("/_authenticated/discover/1")({
@@ -39,6 +52,7 @@ export const Route = createFileRoute("/_authenticated/discover/1")({
     tab: s["tab"] === "creators" ? "creators" : "events",
     q: typeof s["q"] === "string" ? s["q"] : undefined,
     scope: s["scope"] === "past" ? "past" : "upcoming",
+    city: typeof s["city"] === "string" ? s["city"] : undefined,
   }),
   head: () => ({
     meta: [
@@ -49,7 +63,10 @@ export const Route = createFileRoute("/_authenticated/discover/1")({
           "Explore verified creator meetups, acoustic nights, workshops, tech launches, and verified creator profiles.",
       },
       { property: "og:site_name", content: "CreatorConnect" },
-      { property: "og:title", content: "Discover Creator Events & Directory in Pune — CreatorConnect" },
+      {
+        property: "og:title",
+        content: "Discover Creator Events & Directory in Pune — CreatorConnect",
+      },
       {
         property: "og:description",
         content:
@@ -59,7 +76,10 @@ export const Route = createFileRoute("/_authenticated/discover/1")({
       { property: "og:url", content: "https://creatorconnect.app/discover/1" },
       { property: "og:image", content: "https://creatorconnect.app/assets/og-image.png" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Discover Creator Events & Directory in Pune — CreatorConnect" },
+      {
+        name: "twitter:title",
+        content: "Discover Creator Events & Directory in Pune — CreatorConnect",
+      },
       {
         name: "twitter:description",
         content:
@@ -76,6 +96,7 @@ function Discover() {
   const searchParams = Route.useSearch();
   const { data: me } = useMe();
   const isCreator = me?.roles?.includes("creator");
+  const isOrganizer = me?.roles?.includes("organizer") || me?.profile?.account_type === "organizer";
 
   const [activeTab, setActiveTab] = useState<"events" | "creators">(
     searchParams.tab === "creators" ? "creators" : "events",
@@ -83,6 +104,7 @@ function Discover() {
   const [eventScope, setEventScope] = useState<"upcoming" | "past">(
     searchParams.scope === "past" ? "past" : "upcoming",
   );
+  const [city, setCity] = useState<string>(searchParams.city ?? "All India");
 
   // Events Filter State
   const [q, setQ] = useState(searchParams.q ?? "");
@@ -99,6 +121,37 @@ function Discover() {
   const [creatorVerifiedOnly, setCreatorVerifiedOnly] = useState(false);
   const [creatorSortBy, setCreatorSortBy] = useState<"followers" | "popular" | "name">("followers");
 
+  // External Booking Redirection Dialog State
+  const [redirectEvent, setRedirectEvent] = useState<{
+    title: string;
+    starts_at: string;
+    venue_name: string;
+    city: string;
+    source_name: string;
+    official_booking_url: string;
+    ticket_price_min?: number | null;
+    ticket_price_max?: number | null;
+    is_free?: boolean;
+    currency?: string;
+  } | null>(null);
+  const [redirectDialogOpen, setRedirectDialogOpen] = useState(false);
+
+  const handleBookExternal = (ext: ExternalEvent) => {
+    setRedirectEvent({
+      title: ext.title,
+      starts_at: ext.starts_at,
+      venue_name: ext.venue_name,
+      city: ext.city,
+      source_name: ext.source_name,
+      official_booking_url: ext.official_booking_url,
+      ticket_price_min: ext.ticket_price_min,
+      ticket_price_max: ext.ticket_price_max,
+      is_free: ext.is_free,
+      currency: ext.currency,
+    });
+    setRedirectDialogOpen(true);
+  };
+
   // Real Supabase Events Query - Only live events (pending remain protected by RLS and status check)
   const eventsQuery = useQuery({
     queryKey: ["events", "live"],
@@ -113,7 +166,102 @@ function Discover() {
     },
   });
 
-  const allEvents = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
+  // External Events Query (Townscript, AllEvents, etc.)
+  const externalEventsQuery = useQuery({
+    queryKey: ["external_events", "live"],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from("external_events")
+          .select("*")
+          .eq("status", "live")
+          .order("starts_at", { ascending: true });
+        if (error) return [] as ExternalEvent[];
+        return (data ?? []) as ExternalEvent[];
+      } catch {
+        return [] as ExternalEvent[];
+      }
+    },
+  });
+
+  type UnifiedEventItem =
+    | {
+        sourceType: "creatorconnect";
+        id: string;
+        title: string;
+        type: string;
+        starts_at: string;
+        venue: string;
+        area: string;
+        city: string;
+        seats_taken: number;
+        capacity: number;
+        status: string;
+        cover_url: string | null;
+        creator: Creator | null;
+        is_demo: boolean;
+        rawEvent: EventWithCreator;
+      }
+    | {
+        sourceType: "external";
+        id: string;
+        title: string;
+        type: string;
+        starts_at: string;
+        venue: string;
+        area: string;
+        city: string;
+        seats_taken: number;
+        capacity: number;
+        status: string;
+        cover_url: string | null;
+        creator: null;
+        is_demo: boolean;
+        source_name: string;
+        rawExternal: ExternalEvent;
+      };
+
+  const allEvents = useMemo<UnifiedEventItem[]>(() => {
+    const internalList: UnifiedEventItem[] = (eventsQuery.data ?? []).map((e) => ({
+      sourceType: "creatorconnect" as const,
+      id: e.id,
+      title: e.title,
+      type: e.type,
+      starts_at: e.starts_at,
+      venue: e.venue,
+      area: e.area,
+      city: e.area || "Pune",
+      seats_taken: e.seats_taken,
+      capacity: e.capacity,
+      status: e.status,
+      cover_url: e.cover_url,
+      creator: e.creator,
+      is_demo: Boolean(e.is_demo),
+      rawEvent: e,
+    }));
+
+    const externalList: UnifiedEventItem[] = (externalEventsQuery.data ?? []).map((e) => ({
+      sourceType: "external" as const,
+      id: e.id,
+      title: e.title,
+      type: e.category,
+      starts_at: e.starts_at,
+      venue: e.venue_name,
+      area: e.address || e.city,
+      city: e.city,
+      seats_taken: 0,
+      capacity: 9999,
+      status: e.status,
+      cover_url: e.cover_url,
+      creator: null,
+      is_demo: Boolean(e.is_demo),
+      source_name: e.source_name,
+      rawExternal: e,
+    }));
+
+    return [...internalList, ...externalList];
+  }, [eventsQuery.data, externalEventsQuery.data]);
+
   const now = new Date();
 
   const upcomingEvents = useMemo(
@@ -147,16 +295,36 @@ function Discover() {
     let res = pool.filter((e) => {
       const d = new Date(e.starts_at);
       if (eventScope === "upcoming") {
-        const m = (d.getFullYear() - nowTime.getFullYear()) * 12 + d.getMonth() - nowTime.getMonth();
+        const m =
+          (d.getFullYear() - nowTime.getFullYear()) * 12 + d.getMonth() - nowTime.getMonth();
         if (when === "this" && m !== 0) return false;
         if (when === "next" && m !== 1) return false;
-        if (availOnly && e.seats_taken >= e.capacity) return false;
+        if (availOnly && e.sourceType === "creatorconnect" && e.seats_taken >= e.capacity)
+          return false;
       }
       if (type !== "All" && e.type !== type) return false;
+
+      // City filter
+      if (city && city !== "All India") {
+        const target = city.toLowerCase().trim();
+        const c = (e.city || "").toLowerCase();
+        const a = (e.area || "").toLowerCase();
+        const v = (e.venue || "").toLowerCase();
+        const matches =
+          target === "delhi ncr"
+            ? c.includes("delhi") ||
+              c.includes("noida") ||
+              c.includes("gurgaon") ||
+              a.includes("delhi") ||
+              a.includes("ncr")
+            : c.includes(target) || a.includes(target) || v.includes(target);
+        if (!matches) return false;
+      }
+
       const s = q.trim().toLowerCase();
       return (
         !s ||
-        [e.title, e.venue, e.area, e.creator?.display_name].some((x) =>
+        [e.title, e.venue, e.area, e.city, e.creator?.display_name].some((x) =>
           x?.toLowerCase().includes(s),
         )
       );
@@ -176,7 +344,7 @@ function Discover() {
     }
 
     return res;
-  }, [eventScope, upcomingEvents, pastEvents, q, type, when, availOnly, sortBy]);
+  }, [eventScope, upcomingEvents, pastEvents, q, type, when, availOnly, sortBy, city]);
 
   // Filtered Creators
   const creatorList = useMemo(() => {
@@ -242,6 +410,7 @@ function Discover() {
     setAvailOnly(false);
     setSortBy("soonest");
     setEventScope("upcoming");
+    setCity("All India");
   };
 
   const clearCreatorFilters = () => {
@@ -260,7 +429,9 @@ function Discover() {
         <div className="max-w-2xl space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full bg-brand/10 border border-brand/20 px-3.5 py-1 text-xs font-semibold text-primary">
             <Sparkles className="size-3.5" aria-hidden />
-            <span>Pune Creator Hub</span>
+            <span>
+              {city === "All India" ? "India Event Discovery" : `${city} Events & Creators`}
+            </span>
           </div>
           <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-foreground leading-tight">
             Meet your favourite creators, in person.
@@ -508,6 +679,18 @@ function Discover() {
                   Past Events ({pastEvents.length})
                 </Chip>
               </div>
+              {/* City selector chips on mobile */}
+              <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+                {MAJOR_INDIAN_CITIES.map((c) => (
+                  <Chip
+                    key={c}
+                    active={city === c || (!city && c === "All India")}
+                    onClick={() => setCity(c)}
+                  >
+                    {c}
+                  </Chip>
+                ))}
+              </div>
               <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
                 {["All", ...EVENT_TYPES].map((t) => (
                   <Chip key={t} active={type === t} onClick={() => setType(t)}>
@@ -539,7 +722,11 @@ function Discover() {
                   <SlidersHorizontal className="size-4 text-primary" aria-hidden />
                   Event Filters
                 </h2>
-                {(type !== "All" || when !== "any" || availOnly || q || eventScope !== "upcoming") && (
+                {(type !== "All" ||
+                  when !== "any" ||
+                  availOnly ||
+                  q ||
+                  eventScope !== "upcoming") && (
                   <button
                     type="button"
                     onClick={clearEventFilters}
@@ -635,14 +822,28 @@ function Discover() {
                 </div>
               )}
 
-              {/* Location Pill & Available Seats */}
+              {/* City Selection & Available Seats */}
               <div className="space-y-3 pt-2 border-t border-border">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Preferences
-                </label>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/60 text-sm font-medium">
-                  <MapPin className="size-4 text-primary" aria-hidden />
-                  <span>Pune, MH</span>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="city-select-sidebar"
+                    className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
+                  >
+                    <MapPin className="size-3.5 text-primary" aria-hidden />
+                    <span>City / Region</span>
+                  </label>
+                  <select
+                    id="city-select-sidebar"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    {MAJOR_INDIAN_CITIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {eventScope === "upcoming" && (
                   <label className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-foreground cursor-pointer hover:bg-muted rounded-xl transition-colors">
@@ -661,6 +862,11 @@ function Discover() {
 
           {/* Right Event Grid Area */}
           <section className="lg:col-span-3 space-y-6">
+            {/* Quick City Filter Bar */}
+            <div className="hidden lg:block pb-1">
+              <CityFilterBar selectedCity={city} onSelectCity={setCity} />
+            </div>
+
             {/* Header Controls: Count & Sort */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
               <div className="flex items-center gap-3">
@@ -718,7 +924,10 @@ function Discover() {
             {eventsQuery.isLoading ? (
               <ListSkeleton tall rows={3} />
             ) : eventsQuery.error ? (
-              <ErrorState message={errMsg(eventsQuery.error)} onRetry={() => eventsQuery.refetch()} />
+              <ErrorState
+                message={errMsg(eventsQuery.error)}
+                onRetry={() => eventsQuery.refetch()}
+              />
             ) : eventScope === "upcoming" && upcomingEvents.length === 0 ? (
               <div className="rounded-3xl bg-card border border-border p-8 md:p-12 text-center shadow-xs space-y-6">
                 <div className="mx-auto size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs">
@@ -729,7 +938,9 @@ function Discover() {
                     No upcoming meetups scheduled right now
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Creators in Pune announce official meetups, workshops, and exclusive launches on a rolling basis. Follow creators in the directory to receive notifications when new tickets drop.
+                    Creators in Pune announce official meetups, workshops, and exclusive launches on
+                    a rolling basis. Follow creators in the directory to receive notifications when
+                    new tickets drop.
                   </p>
                 </div>
 
@@ -748,16 +959,21 @@ function Discover() {
                       onClick={() => setEventScope("past")}
                       className="gap-2 rounded-2xl font-semibold px-5"
                     >
-                      <Clock className="size-4 text-muted-foreground" /> Browse Past Events ({pastEvents.length})
+                      <Clock className="size-4 text-muted-foreground" /> Browse Past Events (
+                      {pastEvents.length})
                     </Button>
                   )}
 
-                  {isCreator ? (
-                    <Link to="/creator/events/create">
-                      <Button variant="outline" className="gap-2 rounded-2xl font-semibold px-5">
+                  {isCreator || isOrganizer ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="gap-2 rounded-2xl font-semibold px-5"
+                    >
+                      <Link to="/creator/events/create">
                         <PlusCircle className="size-4 text-primary" /> Host an Event
-                      </Button>
-                    </Link>
+                      </Link>
+                    </Button>
                   ) : (
                     <Link to="/profile">
                       <Button
@@ -795,9 +1011,17 @@ function Discover() {
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {eventList.map((e) => (
-                    <EventCardLarge key={e.id} e={e} />
-                  ))}
+                  {eventList.map((e) =>
+                    e.sourceType === "external" ? (
+                      <ExternalEventCardLarge
+                        key={e.id}
+                        e={e.rawExternal}
+                        onBook={handleBookExternal}
+                      />
+                    ) : (
+                      <EventCardLarge key={e.id} e={e.rawEvent} />
+                    ),
+                  )}
                 </div>
               </div>
             ) : (
@@ -811,8 +1035,15 @@ function Discover() {
                     {/* Mobile: Horizontal Snap Scroll, Desktop: 3-Column Card Grid */}
                     <div className="no-scrollbar -mx-4 flex snap-x gap-4 overflow-x-auto px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-3 lg:overflow-visible">
                       {soonEvents.map((e) => (
-                        <div key={e.id} className="w-[82%] sm:w-[60%] lg:w-full shrink-0 snap-start">
-                          <EventCardLarge e={e} />
+                        <div
+                          key={e.id}
+                          className="w-[82%] sm:w-[60%] lg:w-full shrink-0 snap-start"
+                        >
+                          {e.sourceType === "external" ? (
+                            <ExternalEventCardLarge e={e.rawExternal} onBook={handleBookExternal} />
+                          ) : (
+                            <EventCardLarge e={e.rawEvent} />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -823,12 +1054,20 @@ function Discover() {
                 {restEvents.length > 0 && (
                   <div>
                     <h2 className="mb-4 text-xl font-bold font-display tracking-tight">
-                      More creator events
+                      More events across India
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                      {restEvents.map((e) => (
-                        <EventCardLarge key={e.id} e={e} />
-                      ))}
+                      {restEvents.map((e) =>
+                        e.sourceType === "external" ? (
+                          <ExternalEventCardLarge
+                            key={e.id}
+                            e={e.rawExternal}
+                            onBook={handleBookExternal}
+                          />
+                        ) : (
+                          <EventCardLarge key={e.id} e={e.rawEvent} />
+                        ),
+                      )}
                     </div>
                   </div>
                 )}
@@ -837,6 +1076,13 @@ function Discover() {
           </section>
         </div>
       )}
+
+      {/* External Booking Redirection Dialog */}
+      <ExternalRedirectDialog
+        open={redirectDialogOpen}
+        onOpenChange={setRedirectDialogOpen}
+        event={redirectEvent}
+      />
     </main>
   );
 }

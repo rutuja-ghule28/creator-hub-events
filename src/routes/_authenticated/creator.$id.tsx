@@ -212,7 +212,8 @@ function CreatorProfilePage() {
                   Profile Verification & Trust Badges
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Individual profile credentials confirmed by CreatorConnect moderation against official documentation.
+                  Individual profile credentials confirmed by CreatorConnect moderation against
+                  official documentation.
                 </p>
               </div>
 
@@ -246,9 +247,7 @@ function CreatorProfilePage() {
                       </span>
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          isVerified
-                            ? "bg-trust-soft text-trust"
-                            : "bg-muted text-muted-foreground"
+                          isVerified ? "bg-trust-soft text-trust" : "bg-muted text-muted-foreground"
                         }`}
                       >
                         {isVerified ? (
@@ -261,9 +260,7 @@ function CreatorProfilePage() {
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-muted-foreground leading-snug">
-                      {vf.criteria}
-                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">{vf.criteria}</p>
 
                     <div className="text-[11px] font-semibold text-foreground pt-1.5 border-t border-border/40 truncate">
                       {vf.key === "name" && c.display_name}

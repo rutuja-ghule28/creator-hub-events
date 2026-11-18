@@ -136,6 +136,7 @@ export type Database = {
           verification_status: string;
           verified: boolean;
           verified_fields: string[];
+          is_demo: boolean;
         };
         Insert: {
           audience_size?: number;
@@ -155,6 +156,7 @@ export type Database = {
           verification_status?: string;
           verified?: boolean;
           verified_fields?: string[];
+          is_demo?: boolean;
         };
         Update: {
           audience_size?: number;
@@ -174,6 +176,7 @@ export type Database = {
           verification_status?: string;
           verified?: boolean;
           verified_fields?: string[];
+          is_demo?: boolean;
         };
         Relationships: [];
       };
@@ -184,7 +187,8 @@ export type Database = {
           capacity: number;
           cover_url: string | null;
           created_at: string;
-          creator_id: string;
+          creator_id: string | null;
+          organizer_id: string | null;
           description: string;
           id: string;
           promotion_brief: string | null;
@@ -195,6 +199,7 @@ export type Database = {
           title: string;
           type: string;
           venue: string;
+          is_demo: boolean;
         };
         Insert: {
           application_deadline?: string | null;
@@ -202,7 +207,8 @@ export type Database = {
           capacity: number;
           cover_url?: string | null;
           created_at?: string;
-          creator_id: string;
+          creator_id?: string | null;
+          organizer_id?: string | null;
           description?: string;
           id?: string;
           promotion_brief?: string | null;
@@ -213,6 +219,7 @@ export type Database = {
           title: string;
           type?: string;
           venue: string;
+          is_demo?: boolean;
         };
         Update: {
           application_deadline?: string | null;
@@ -220,7 +227,8 @@ export type Database = {
           capacity?: number;
           cover_url?: string | null;
           created_at?: string;
-          creator_id?: string;
+          creator_id?: string | null;
+          organizer_id?: string | null;
           description?: string;
           id?: string;
           promotion_brief?: string | null;
@@ -231,6 +239,7 @@ export type Database = {
           title?: string;
           type?: string;
           venue?: string;
+          is_demo?: boolean;
         };
         Relationships: [
           {
@@ -238,6 +247,121 @@ export type Database = {
             columns: ["creator_id"];
             isOneToOne: false;
             referencedRelation: "creators";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "events_organizer_id_fkey";
+            columns: ["organizer_id"];
+            isOneToOne: false;
+            referencedRelation: "organizers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      external_events: {
+        Row: {
+          address: string | null;
+          category: string;
+          city: string;
+          country: string;
+          cover_url: string | null;
+          created_at: string;
+          currency: string;
+          description: string;
+          ends_at: string | null;
+          id: string;
+          is_demo: boolean;
+          is_free: boolean;
+          official_booking_url: string;
+          source_event_id: string;
+          source_event_url: string;
+          source_last_verified_at: string;
+          source_name: string;
+          starts_at: string;
+          state: string | null;
+          status: string;
+          submission_type: string;
+          submitted_by_creator_id: string | null;
+          submitted_by_organizer_id: string | null;
+          ticket_price_max: number | null;
+          ticket_price_min: number | null;
+          title: string;
+          updated_at: string;
+          venue_name: string;
+        };
+        Insert: {
+          address?: string | null;
+          category?: string;
+          city: string;
+          country?: string;
+          cover_url?: string | null;
+          created_at?: string;
+          currency?: string;
+          description?: string;
+          ends_at?: string | null;
+          id?: string;
+          is_demo?: boolean;
+          is_free?: boolean;
+          official_booking_url: string;
+          source_event_id: string;
+          source_event_url: string;
+          source_last_verified_at?: string;
+          source_name: string;
+          starts_at: string;
+          state?: string | null;
+          status?: string;
+          submission_type?: string;
+          submitted_by_creator_id?: string | null;
+          submitted_by_organizer_id?: string | null;
+          ticket_price_max?: number | null;
+          ticket_price_min?: number | null;
+          title: string;
+          updated_at?: string;
+          venue_name: string;
+        };
+        Update: {
+          address?: string | null;
+          category?: string;
+          city?: string;
+          country?: string;
+          cover_url?: string | null;
+          created_at?: string;
+          currency?: string;
+          description?: string;
+          ends_at?: string | null;
+          id?: string;
+          is_demo?: boolean;
+          is_free?: boolean;
+          official_booking_url?: string;
+          source_event_id?: string;
+          source_event_url?: string;
+          source_last_verified_at?: string;
+          source_name?: string;
+          starts_at?: string;
+          state?: string | null;
+          status?: string;
+          submission_type?: string;
+          submitted_by_creator_id?: string | null;
+          submitted_by_organizer_id?: string | null;
+          ticket_price_max?: number | null;
+          ticket_price_min?: number | null;
+          title?: string;
+          updated_at?: string;
+          venue_name?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "external_events_submitted_by_creator_id_fkey";
+            columns: ["submitted_by_creator_id"];
+            isOneToOne: false;
+            referencedRelation: "creators";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "external_events_submitted_by_organizer_id_fkey";
+            columns: ["submitted_by_organizer_id"];
+            isOneToOne: false;
+            referencedRelation: "organizers";
             referencedColumns: ["id"];
           },
         ];
@@ -330,8 +454,77 @@ export type Database = {
           },
         ];
       };
+      organizers: {
+        Row: {
+          avatar_url: string | null;
+          bio: string;
+          created_at: string;
+          id: string;
+          location: string;
+          name: string;
+          user_id: string;
+          website_url: string | null;
+        };
+        Insert: {
+          avatar_url?: string | null;
+          bio?: string;
+          created_at?: string;
+          id?: string;
+          location?: string;
+          name: string;
+          user_id: string;
+          website_url?: string | null;
+        };
+        Update: {
+          avatar_url?: string | null;
+          bio?: string;
+          created_at?: string;
+          id?: string;
+          location?: string;
+          name?: string;
+          user_id?: string;
+          website_url?: string | null;
+        };
+        Relationships: [];
+      };
+      organizer_private_details: {
+        Row: {
+          contact_email: string | null;
+          contact_phone: string | null;
+          created_at: string;
+          id: string;
+          organizer_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          created_at?: string;
+          id?: string;
+          organizer_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          created_at?: string;
+          id?: string;
+          organizer_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "organizer_private_details_organizer_id_fkey";
+            columns: ["organizer_id"];
+            isOneToOne: true;
+            referencedRelation: "organizers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
+          account_type: string;
           avatar_url: string | null;
           city: string | null;
           created_at: string;
@@ -343,6 +536,7 @@ export type Database = {
           suspended: boolean;
         };
         Insert: {
+          account_type?: string;
           avatar_url?: string | null;
           city?: string | null;
           created_at?: string;
@@ -354,6 +548,7 @@ export type Database = {
           suspended?: boolean;
         };
         Update: {
+          account_type?: string;
           avatar_url?: string | null;
           city?: string | null;
           created_at?: string;
@@ -527,7 +722,7 @@ export type Database = {
       };
     };
     Enums: {
-      app_role: "attendee" | "creator" | "admin";
+      app_role: "attendee" | "creator" | "organizer" | "admin";
       event_status: "pending" | "live" | "rejected" | "removed";
     };
     CompositeTypes: {
@@ -650,7 +845,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["attendee", "creator", "admin"],
+      app_role: ["attendee", "creator", "organizer", "admin"],
       event_status: ["pending", "live", "rejected", "removed"],
     },
   },

@@ -190,7 +190,7 @@ describe("Event Discovery & Lifecycle Workflows", () => {
   it("correctly partitions live events into upcoming and past based on current time", () => {
     const { upcoming, past } = partitionEvents(mockEvents, currentDate);
     expect(upcoming).toHaveLength(1);
-    expect(upcoming[0].id).toBe("e5"); // Dec 15, 2026 is future
+    expect(upcoming[0]?.id).toBe("e5"); // Dec 15, 2026 is future
 
     expect(past).toHaveLength(3);
     expect(past.map((e) => e.id)).toEqual(["e1", "e2", "e3"]);
@@ -200,9 +200,9 @@ describe("Event Discovery & Lifecycle Workflows", () => {
     const { past } = partitionEvents(mockEvents, currentDate);
     const sortedPast = filterEvents(past, "past", currentDate, { sortBy: "soonest" });
     // e3 is Oct 24, e2 is Oct 19, e1 is Oct 15
-    expect(sortedPast[0].id).toBe("e3");
-    expect(sortedPast[1].id).toBe("e2");
-    expect(sortedPast[2].id).toBe("e1");
+    expect(sortedPast[0]?.id).toBe("e3");
+    expect(sortedPast[1]?.id).toBe("e2");
+    expect(sortedPast[2]?.id).toBe("e1");
   });
 
   it("identifies concluded status and prevents booking on past events", () => {
@@ -241,7 +241,7 @@ describe("Event Discovery & Lifecycle Workflows", () => {
 
     const workshopFilter = filterEvents(upcoming, "upcoming", currentDate, { type: "Workshop" });
     expect(workshopFilter).toHaveLength(1);
-    expect(workshopFilter[0].id).toBe("e5");
+    expect(workshopFilter[0]?.id).toBe("e5");
 
     const meetupFilter = filterEvents(upcoming, "upcoming", currentDate, { type: "Meetup" });
     expect(meetupFilter).toHaveLength(0);

@@ -5,6 +5,7 @@ import type { Creator, EventRow } from "@/lib/cc";
 const sampleEvent: EventRow = {
   id: "ev-1",
   creator_id: "host-creator-id",
+  organizer_id: null,
   title: "Pune Tech Innovators Meetup",
   description: "Hands-on tech launch and gadget workshop for developers and creators.",
   type: "Workshop",
@@ -19,6 +20,7 @@ const sampleEvent: EventRow = {
   promotion_brief: "Promote on YouTube and Instagram",
   application_deadline: "2026-11-28T18:00:00Z",
   status: "live",
+  is_demo: false,
 };
 
 const sampleCreator: Creator = {
@@ -39,6 +41,7 @@ const sampleCreator: Creator = {
   page_views: 1200,
   created_at: "2026-10-01T10:00:00Z",
   verification_docs: [],
+  is_demo: false,
 };
 
 describe("Creator-Event Matching Engine", () => {
@@ -79,7 +82,12 @@ describe("Creator-Event Matching Engine", () => {
     const verifiedResult = calculateMatchScore(sampleEvent, sampleCreator);
     expect(verifiedResult.breakdown.trustScore).toBe(15); // 12 base + 3 verified fields
 
-    const unverifiedCreator = { ...sampleCreator, verified: false, verification_status: "pending", verified_fields: [] };
+    const unverifiedCreator = {
+      ...sampleCreator,
+      verified: false,
+      verification_status: "pending",
+      verified_fields: [],
+    };
     const unverifiedResult = calculateMatchScore(sampleEvent, unverifiedCreator);
     expect(unverifiedResult.breakdown.trustScore).toBe(9);
   });
@@ -103,6 +111,7 @@ describe("Creator-Event Matching Engine", () => {
       page_views: 0,
       created_at: "2026-10-01T10:00:00Z",
       verification_docs: [],
+      is_demo: false,
     };
 
     const result = calculateMatchScore({ ...sampleEvent, target_niche: null }, incompleteCreator);
@@ -112,16 +121,34 @@ describe("Creator-Event Matching Engine", () => {
   });
 
   it("ranks creators descending by score and excludes the host creator", () => {
-    const hostAsCreator: Creator = { ...sampleCreator, id: "host-creator-id", display_name: "Host Organizer" };
-    const creatorA: Creator = { ...sampleCreator, id: "cr-a", display_name: "Perfect Match", category: "Tech reviewer", location: "Pune", audience_size: 20000 };
-    const creatorB: Creator = { ...sampleCreator, id: "cr-b", display_name: "Distant Match", category: "Food", location: "Delhi", audience_size: 500 };
+    const hostAsCreator: Creator = {
+      ...sampleCreator,
+      id: "host-creator-id",
+      display_name: "Host Organizer",
+    };
+    const creatorA: Creator = {
+      ...sampleCreator,
+      id: "cr-a",
+      display_name: "Perfect Match",
+      category: "Tech reviewer",
+      location: "Pune",
+      audience_size: 20000,
+    };
+    const creatorB: Creator = {
+      ...sampleCreator,
+      id: "cr-b",
+      display_name: "Distant Match",
+      category: "Food",
+      location: "Delhi",
+      audience_size: 500,
+    };
 
     const ranked = rankCreatorsForEvent(sampleEvent, [hostAsCreator, creatorB, creatorA], 5);
 
     // Host must be excluded
     expect(ranked.some((r) => r.creator.id === "host-creator-id")).toBe(false);
     expect(ranked.length).toBe(2);
-    expect(ranked[0].creator.id).toBe("cr-a");
-    expect(ranked[0].totalScore).toBeGreaterThan(ranked[1].totalScore);
+    expect(ranked[0]?.creator.id).toBe("cr-a");
+    expect(ranked[0]?.totalScore).toBeGreaterThan(ranked[1]?.totalScore ?? 0);
   });
 });

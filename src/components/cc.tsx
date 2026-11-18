@@ -19,11 +19,37 @@ import {
   Users,
   Check,
   ArrowRight,
+  ExternalLink,
+  Globe,
+  Info,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { fmtDateTime, fmtCount, seatsLeft, type Creator, type EventWithCreator, type Me } from "@/lib/cc";
+import {
+  fmtDateTime,
+  fmtCount,
+  seatsLeft,
+  type Creator,
+  type EventWithCreator,
+  type Me,
+} from "@/lib/cc";
+import {
+  getSourceMeta,
+  validateExternalUrl,
+  formatExternalPrice,
+  type ExternalEvent,
+  MAJOR_INDIAN_CITIES,
+} from "@/lib/external-events";
 
 /* ---------- Generated SVG cover ---------- */
 const PALETTES = [
@@ -200,7 +226,7 @@ export function EventCardLarge({ e }: { e: EventWithCreator }) {
       params={{ id: e.id }}
       className={cn(
         "block w-[78%] shrink-0 snap-start overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-border transition-all hover:ring-primary/40",
-        isPast && "opacity-95"
+        isPast && "opacity-95",
       )}
     >
       <div className="relative aspect-[5/3]">
@@ -228,14 +254,18 @@ export function EventCardLarge({ e }: { e: EventWithCreator }) {
         {isPast ? (
           <p className="text-xs text-muted-foreground pt-1 flex items-center justify-between">
             <span className="font-semibold text-muted-foreground">Concluded</span>
-            <span>Registered passes: {e.seats_taken}/{e.capacity}</span>
+            <span>
+              Registered passes: {e.seats_taken}/{e.capacity}
+            </span>
           </p>
         ) : (
           <p className="text-xs text-muted-foreground pt-1 flex items-center justify-between">
             <span className={cn("font-medium", seatsLeft(e) <= 20 ? "text-warn-foreground" : "")}>
               {seatsLeft(e) === 0 ? "Sold out" : `${seatsLeft(e)} seats left`}
             </span>
-            <span>{e.seats_taken}/{e.capacity} registered</span>
+            <span>
+              {e.seats_taken}/{e.capacity} registered
+            </span>
           </p>
         )}
       </div>
@@ -273,7 +303,12 @@ export function EventRowCompact({ e, right }: { e: EventWithCreator; right?: Rea
         <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
           <MapPin className="size-3" aria-hidden />
           {e.area}
-          <span className={cn("ml-auto font-medium", !isPast && left <= 20 ? "text-warn-foreground" : "")}>
+          <span
+            className={cn(
+              "ml-auto font-medium",
+              !isPast && left <= 20 ? "text-warn-foreground" : "",
+            )}
+          >
             {isPast ? "Concluded" : left === 0 ? "Sold out" : `${left} left`}
           </span>
         </p>
@@ -512,6 +547,7 @@ export function DesktopSidebar({ me }: { me?: Me | null | undefined }) {
   const currentPath = router.state.location.pathname;
 
   const isCreator = me?.roles?.includes("creator");
+  const isOrganizer = me?.roles?.includes("organizer") || me?.profile?.account_type === "organizer";
   const isAdmin = me?.roles?.includes("admin");
 
   const attendeeNav = [
@@ -529,6 +565,15 @@ export function DesktopSidebar({ me }: { me?: Me | null | undefined }) {
         { to: "/creator/events/create", label: "Create Event", icon: PlusCircle },
       ]
     : [];
+
+  const organizerNav =
+    isOrganizer && !isCreator
+      ? [
+          { to: "/creator/dashboard", label: "Host Overview", icon: LayoutDashboard },
+          { to: "/creator/events", label: "Manage Events", icon: CalendarDays },
+          { to: "/creator/events/create", label: "Host Event", icon: PlusCircle },
+        ]
+      : [];
 
   const adminNav = isAdmin
     ? [
@@ -605,6 +650,36 @@ export function DesktopSidebar({ me }: { me?: Me | null | undefined }) {
             </p>
             <nav className="space-y-1">
               {creatorNav.map((item) => {
+                const active = currentPath === item.to || currentPath.startsWith(item.to);
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      active
+                        ? "bg-brand text-primary-foreground shadow-brand font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                    )}
+                    title={item.label}
+                  >
+                    <item.icon className="size-5 shrink-0" />
+                    <span className="hidden lg:inline truncate">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        )}
+
+        {/* Host / Organizer Hub */}
+        {organizerNav.length > 0 && (
+          <div>
+            <p className="hidden lg:block px-3 mb-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              Host / Organizer
+            </p>
+            <nav className="space-y-1">
+              {organizerNav.map((item) => {
                 const active = currentPath === item.to || currentPath.startsWith(item.to);
                 return (
                   <Link
@@ -822,6 +897,297 @@ export function MiniBars({
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ---------- External Event Discovery & Booking Redirection ---------- */
+
+export function ExternalRedirectDialog({
+  open,
+  onOpenChange,
+  event,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  event: {
+    title: string;
+    starts_at: string;
+    venue_name: string;
+    city: string;
+    source_name: string;
+    official_booking_url: string;
+    ticket_price_min?: number | null;
+    ticket_price_max?: number | null;
+    is_free?: boolean;
+    currency?: string;
+  } | null;
+}) {
+  if (!event) return null;
+  const meta = getSourceMeta(event.source_name);
+  const priceDisplay = formatExternalPrice(
+    Boolean(event.is_free),
+    event.ticket_price_min,
+    event.ticket_price_max,
+    event.currency,
+  );
+
+  const handleContinue = () => {
+    const val = validateExternalUrl(event.official_booking_url);
+    if (!val.valid || !val.normalizedUrl) {
+      toast.error(val.error || "Cannot redirect: booking URL is invalid or insecure");
+      return;
+    }
+    toast.success(`Redirecting to ${meta.label}...`);
+    window.open(val.normalizedUrl, "_blank", "noopener,noreferrer");
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md rounded-3xl p-6 sm:p-7">
+        <DialogHeader className="space-y-2 text-left">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border",
+                meta.badgeClass,
+              )}
+            >
+              <Globe className="size-3.5" /> {meta.label}
+            </span>
+            <span className="text-xs text-muted-foreground font-medium">Official Ticketing</span>
+          </div>
+          <DialogTitle className="font-display text-xl font-bold text-foreground">
+            Leaving Creator Connect
+          </DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            You are being redirected to {meta.label} to complete your official event registration or
+            ticket purchase.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="my-4 space-y-3 rounded-2xl bg-muted/40 p-4 border border-border">
+          <div>
+            <h4 className="font-semibold text-sm text-foreground line-clamp-1">{event.title}</h4>
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+              <CalendarDays className="size-3 text-primary" /> {fmtDateTime(event.starts_at)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+              <MapPin className="size-3 text-primary" /> {event.venue_name}, {event.city}
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Pricing:</span>
+            <span className="font-bold text-foreground">{priceDisplay}</span>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2.5">
+          <Info className="size-4 shrink-0 text-blue-500 mt-0.5" />
+          <p className="leading-relaxed">
+            Creator Connect is an independent event discovery platform. Ticket sales, seat
+            allocation, and customer support are fulfilled directly by {meta.label}.
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5">
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-2xl h-11"
+            onClick={() => onOpenChange(false)}
+          >
+            Stay on Creator Connect
+          </Button>
+          <Button
+            type="button"
+            variant="brand"
+            className="rounded-2xl h-11 gap-1.5 shadow-brand"
+            onClick={handleContinue}
+          >
+            <span>Continue to {meta.label}</span>
+            <ExternalLink className="size-4" />
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function ExternalEventCardLarge({
+  e,
+  onBook,
+}: {
+  e: ExternalEvent;
+  onBook: (event: ExternalEvent) => void;
+}) {
+  const isPast = new Date(e.starts_at) < new Date();
+  const meta = getSourceMeta(e.source_name);
+  const priceDisplay = formatExternalPrice(
+    Boolean(e.is_free),
+    e.ticket_price_min,
+    e.ticket_price_max,
+    e.currency,
+  );
+
+  return (
+    <div
+      className={cn(
+        "group block w-[78%] shrink-0 snap-start overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-border transition-all hover:ring-primary/40",
+        isPast && "opacity-95",
+      )}
+    >
+      <div className="relative aspect-[5/3]">
+        <EventCover id={e.id} src={e.cover_url} alt="" className="absolute inset-0 h-full w-full" />
+        <div className="absolute left-3 top-3 flex items-center gap-1.5 flex-wrap">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md shadow-xs border",
+              meta.badgeClass,
+            )}
+          >
+            <Globe className="size-3" /> {meta.label}
+          </span>
+          {e.submission_type === "organizer" && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/90 text-amber-950 backdrop-blur-md shadow-xs">
+              Organizer Submission
+            </span>
+          )}
+          {isPast && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/75 backdrop-blur-md px-2.5 py-1 text-xs font-semibold text-white/95 border border-white/20">
+              Concluded
+            </span>
+          )}
+        </div>
+        <span className="absolute bottom-3 left-3 rounded-full bg-card/90 px-2.5 py-1 text-xs font-semibold text-foreground">
+          {e.category}
+        </span>
+      </div>
+      <div className="space-y-1.5 p-4">
+        <h3 className="line-clamp-1 text-lg font-semibold group-hover:text-primary transition-colors">
+          {e.title}
+        </h3>
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground line-clamp-1">
+          <MapPin className="size-3.5 text-primary shrink-0" aria-hidden />
+          {e.venue_name}, {e.city}
+        </p>
+        <p className="flex items-center gap-1.5 text-sm">
+          <CalendarDays className="size-4 text-primary shrink-0" aria-hidden />
+          {fmtDateTime(e.starts_at)}
+        </p>
+        <div className="pt-2 border-t border-border flex items-center justify-between">
+          <span className="text-xs font-bold text-foreground">{priceDisplay}</span>
+          <Button
+            type="button"
+            size="sm"
+            variant={isPast ? "outline" : "brand"}
+            className="rounded-full text-xs h-8 px-3 gap-1"
+            disabled={isPast}
+            onClick={() => onBook(e)}
+          >
+            <span>{isPast ? "Concluded" : "Book Tickets"}</span>
+            {!isPast && <ExternalLink className="size-3" />}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ExternalEventRowCompact({
+  e,
+  onBook,
+}: {
+  e: ExternalEvent;
+  onBook: (event: ExternalEvent) => void;
+}) {
+  const isPast = new Date(e.starts_at) < new Date();
+  const meta = getSourceMeta(e.source_name);
+  const priceDisplay = formatExternalPrice(
+    Boolean(e.is_free),
+    e.ticket_price_min,
+    e.ticket_price_max,
+    e.currency,
+  );
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition hover:ring-primary/40">
+      <div className="relative size-20 shrink-0 overflow-hidden rounded-xl">
+        <EventCover id={e.id} src={e.cover_url} alt="" className="absolute inset-0 h-full w-full" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="mb-0.5 flex items-center gap-1.5 text-[11px] font-semibold flex-wrap">
+          <span className={cn("px-2 py-0.5 rounded-full border text-[10px]", meta.badgeClass)}>
+            {meta.label}
+          </span>
+          {e.submission_type === "organizer" && (
+            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              Organizer Submission
+            </span>
+          )}
+          <span className="text-xs text-muted-foreground uppercase">{e.category}</span>
+          {isPast && (
+            <span className="text-[10px] text-muted-foreground font-semibold px-1.5 py-0.5 bg-muted rounded border border-border">
+              Concluded
+            </span>
+          )}
+        </div>
+        <h3 className="line-clamp-1 font-semibold text-sm">{e.title}</h3>
+        <p className="line-clamp-1 text-xs text-muted-foreground">
+          {e.venue_name}, {e.city} · {fmtDateTime(e.starts_at)}
+        </p>
+        <p className="mt-1 text-xs font-semibold text-primary">{priceDisplay}</p>
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant={isPast ? "outline" : "brand"}
+        className="shrink-0 rounded-full text-xs h-8 px-3 gap-1"
+        disabled={isPast}
+        onClick={() => onBook(e)}
+      >
+        <span>{isPast ? "Past" : "Book"}</span>
+        {!isPast && <ExternalLink className="size-3" />}
+      </Button>
+    </div>
+  );
+}
+
+export function CityFilterBar({
+  selectedCity,
+  onSelectCity,
+  cities = MAJOR_INDIAN_CITIES,
+}: {
+  selectedCity: string;
+  onSelectCity: (city: string) => void;
+  cities?: readonly string[];
+}) {
+  return (
+    <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
+      <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground mr-1 shrink-0">
+        <MapPin className="size-3.5 text-primary" />
+        <span>City:</span>
+      </div>
+      {cities.map((city) => {
+        const active = selectedCity === city || (!selectedCity && city === "All India");
+        return (
+          <button
+            key={city}
+            type="button"
+            onClick={() => onSelectCity(city)}
+            className={cn(
+              "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all border",
+              active
+                ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                : "bg-card text-muted-foreground border-border hover:bg-muted/70 hover:text-foreground",
+            )}
+          >
+            {city}
+          </button>
+        );
+      })}
     </div>
   );
 }

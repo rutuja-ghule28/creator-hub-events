@@ -1,6 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Users, Eye, Bookmark, CalendarDays, PlusCircle, ArrowUpRight } from "lucide-react";
+import {
+  Users,
+  Eye,
+  Bookmark,
+  CalendarDays,
+  PlusCircle,
+  ArrowUpRight,
+  Sparkles,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EVENT_SELECT, errMsg, fmtDateTime, useMe, type EventWithCreator } from "@/lib/cc";
 import {
@@ -47,25 +55,70 @@ export const Route = createFileRoute("/_authenticated/creator/dashboard")({
 });
 
 function CreatorDashboardPage() {
-  const { data: me } = useMe();
+  const { data: me, isLoading: meLoading } = useMe();
+
+  const isAuthorized =
+    me?.roles?.includes("creator") ||
+    me?.roles?.includes("organizer") ||
+    me?.profile?.account_type === "creator" ||
+    me?.profile?.account_type === "organizer" ||
+    me?.roles?.includes("admin");
 
   const eventsQuery = useQuery({
-    queryKey: ["creator-events", me?.creator?.id],
+    queryKey: ["creator-events", me?.creator?.id, me?.organizer?.id],
     queryFn: async () => {
-      if (!me?.creator?.id) return [];
-      const { data, error } = await supabase
-        .from("events")
-        .select(EVENT_SELECT)
-        .eq("creator_id", me.creator.id)
-        .order("starts_at", { ascending: true });
+      const creatorId = me?.creator?.id;
+      const organizerId = me?.organizer?.id;
+      if (!creatorId && !organizerId) return [];
+
+      let query = supabase.from("events").select(EVENT_SELECT);
+      if (creatorId && organizerId) {
+        query = query.or(`creator_id.eq.${creatorId},organizer_id.eq.${organizerId}`);
+      } else if (creatorId) {
+        query = query.eq("creator_id", creatorId);
+      } else if (organizerId) {
+        query = query.eq("organizer_id", organizerId);
+      }
+      const { data, error } = await query.order("starts_at", { ascending: true });
       if (error) throw error;
-      return data as unknown as EventWithCreator[];
+      return (data ?? []) as unknown as EventWithCreator[];
     },
-    enabled: !!me?.creator?.id,
+    enabled: !!(me?.creator?.id || me?.organizer?.id),
   });
 
   const events = eventsQuery.data ?? [];
   const totalRegistrations = events.reduce((acc, curr) => acc + curr.seats_taken, 0);
+
+  if (meLoading) {
+    return <ListSkeleton />;
+  }
+
+  if (me && !isAuthorized) {
+    return (
+      <main className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="size-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+          <Sparkles className="size-8" />
+        </div>
+        <h1 className="font-display text-2xl font-bold">Creator &amp; Host Dashboard</h1>
+        <p className="text-sm text-muted-foreground max-w-md">
+          You are currently signed in as an Attendee. Creator and Host management tools are
+          available for verified Creator and Organizer accounts.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link to="/profile">
+            <Button variant="brand" className="rounded-xl">
+              Go to Profile to Apply
+            </Button>
+          </Link>
+          <Link to="/discover/1">
+            <Button variant="outline" className="rounded-xl">
+              Discover Events
+            </Button>
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="px-4 py-5 md:px-6 md:py-8 pb-24 space-y-8">
@@ -79,11 +132,11 @@ function CreatorDashboardPage() {
             Overview of your events, registrations, and audience engagement.
           </p>
         </div>
-        <Link to="/creator/events/create">
-          <Button variant="brand" className="gap-2 rounded-2xl font-semibold shadow-brand">
+        <Button asChild variant="brand" className="gap-2 rounded-2xl font-semibold shadow-brand">
+          <Link to="/creator/events/create">
             <PlusCircle className="size-4" /> Create New Event
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
 
       {/* Main Grid: Registrations Chart (Wide) + Stat Cards Column */}
@@ -167,9 +220,9 @@ function CreatorDashboardPage() {
             title="No events created yet"
             body="Publish your first event to start accepting guest registrations."
             action={
-              <Link to="/creator/events/create">
-                <Button variant="brand">Create event</Button>
-              </Link>
+              <Button asChild variant="brand">
+                <Link to="/creator/events/create">Create event</Link>
+              </Button>
             }
           />
         ) : (

@@ -17,6 +17,9 @@ import {
   AlertCircle,
   Check,
   X,
+  ExternalLink,
+  Globe,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,7 +40,9 @@ import {
   ListSkeleton,
   OfficialSeal,
   SeatsBar,
+  ExternalRedirectDialog,
 } from "@/components/cc";
+import { getSourceMeta, formatExternalPrice, type ExternalEvent } from "@/lib/external-events";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -116,17 +121,60 @@ function EventPage() {
   const [reportReason, setReportReason] = useState("misleading");
   const [reportNote, setReportNote] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
+  const [externalRedirectOpen, setExternalRedirectOpen] = useState(false);
 
   const query = useQuery({
     queryKey: ["event", id],
     queryFn: async () => {
+      // 1. Try internal creator events
       const { data, error } = await supabase
         .from("events")
         .select(EVENT_SELECT)
         .eq("id", id)
-        .single();
+        .maybeSingle();
+
+      if (data) {
+        return {
+          sourceType: "creatorconnect" as const,
+          ...data,
+          external: null as ExternalEvent | null,
+        };
+      }
+
+      // 2. Try external verified events
+      const { data: extData } = await supabase
+        .from("external_events")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (extData) {
+        return {
+          sourceType: "external" as const,
+          id: extData.id,
+          title: extData.title,
+          type: extData.category,
+          description: extData.description,
+          starts_at: extData.starts_at,
+          venue: extData.venue_name,
+          area: extData.city,
+          capacity: 9999,
+          seats_taken: 0,
+          status: extData.status as "live" | "pending" | "rejected" | "removed",
+          cover_url: extData.cover_url,
+          creator_id: "",
+          organizer_id: extData.submitted_by_organizer_id ?? null,
+          promotion_brief: null,
+          target_niche: null,
+          application_deadline: null,
+          created_at: extData.created_at,
+          creator: null,
+          external: extData as ExternalEvent,
+        };
+      }
+
       if (error) throw error;
-      return data as unknown as EventWithCreator;
+      throw new Error("Event not found");
     },
   });
 
@@ -165,7 +213,10 @@ function EventPage() {
   const left = e ? seatsLeft(e) : 0;
   const existingApp = myApplicationQuery.data;
 
-  const isOrganizer = !!(me?.creator?.id && e?.creator_id && me.creator.id === e.creator_id);
+  const isOrganizer = !!(
+    (me?.creator?.id && e?.creator_id && me.creator.id === e.creator_id) ||
+    (me?.organizer?.id && e?.organizer_id && me.organizer.id === e.organizer_id)
+  );
   const isPast = e?.starts_at ? new Date(e.starts_at) < new Date() : false;
   const isDeadlinePassed = e?.application_deadline
     ? new Date(e.application_deadline) < new Date()
@@ -370,7 +421,8 @@ function EventPage() {
                       Creator Campaign & Collaboration
                     </h2>
                     <p className="text-xs text-muted-foreground">
-                      The organizer is actively inviting creators to participate and promote this event.
+                      The organizer is actively inviting creators to participate and promote this
+                      event.
                     </p>
                   </div>
 
@@ -381,7 +433,11 @@ function EventPage() {
                         : "bg-trust-soft text-trust"
                     }`}
                   >
-                    {isPast ? "Event Concluded" : isDeadlinePassed ? "Applications Closed" : "Open for Pitches"}
+                    {isPast
+                      ? "Event Concluded"
+                      : isDeadlinePassed
+                        ? "Applications Closed"
+                        : "Open for Pitches"}
                   </span>
                 </div>
 
@@ -400,7 +456,9 @@ function EventPage() {
                       Application Deadline
                     </span>
                     <p className="font-semibold text-foreground text-sm">
-                      {e.application_deadline ? fmtDateTime(e.application_deadline) : "Until Event Date"}
+                      {e.application_deadline
+                        ? fmtDateTime(e.application_deadline)
+                        : "Until Event Date"}
                     </p>
                   </div>
                 </div>
@@ -423,7 +481,11 @@ function EventPage() {
                         You are hosting this campaign. Review and manage all creator applications.
                       </p>
                       <Link to="/creator/events/$id/manage" params={{ id: e.id }}>
-                        <Button variant="brand" size="sm" className="rounded-xl text-xs font-semibold">
+                        <Button
+                          variant="brand"
+                          size="sm"
+                          className="rounded-xl text-xs font-semibold"
+                        >
                           Manage Applications
                         </Button>
                       </Link>
@@ -454,7 +516,13 @@ function EventPage() {
                         "{existingApp.pitch}"
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        Submitted {new Date(existingApp.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        Submitted{" "}
+                        {new Date(existingApp.created_at).toLocaleDateString("en-IN", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </p>
                     </div>
                   ) : me?.creator ? (
@@ -475,14 +543,25 @@ function EventPage() {
                         className="rounded-xl gap-2 text-xs font-semibold shadow-brand w-full sm:w-auto"
                       >
                         <Sparkles className="size-3.5" />
-                        {isPast ? "Event Concluded" : isDeadlinePassed ? "Deadline Passed" : "Apply to Campaign"}
+                        {isPast
+                          ? "Event Concluded"
+                          : isDeadlinePassed
+                            ? "Deadline Passed"
+                            : "Apply to Campaign"}
                       </Button>
                     </div>
                   ) : (
                     <div className="p-3.5 rounded-2xl bg-card border border-border text-xs text-muted-foreground flex items-center justify-between">
-                      <span>Creators can apply to this event campaign. Apply for creator verification to submit pitches.</span>
+                      <span>
+                        Creators can apply to this event campaign. Apply for creator verification to
+                        submit pitches.
+                      </span>
                       <Link to="/profile">
-                        <Button variant="outline" size="sm" className="rounded-xl text-xs font-semibold">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl text-xs font-semibold"
+                        >
                           View Profile
                         </Button>
                       </Link>
@@ -561,7 +640,39 @@ function EventPage() {
           <div className="lg:col-span-4">
             <div className="sticky top-24 space-y-6 rounded-3xl bg-card border border-border p-6 shadow-md">
               {/* Event Price & Seats */}
-              {isPast ? (
+              {e.sourceType === "external" && e.external ? (
+                <div className="space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-display text-2xl font-bold text-foreground">
+                      {formatExternalPrice(
+                        e.external.is_free,
+                        e.external.ticket_price_min,
+                        e.external.ticket_price_max,
+                        e.external.currency,
+                      )}
+                    </span>
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full border inline-flex items-center gap-1 ${
+                        getSourceMeta(e.external.source_name).badgeClass
+                      }`}
+                    >
+                      <Globe className="size-3" />
+                      {getSourceMeta(e.external.source_name).label}
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl bg-muted/40 p-4 border border-border space-y-2 text-xs">
+                    <p className="font-semibold text-foreground flex items-center gap-1.5">
+                      <Globe className="size-3.5 text-primary" />
+                      Official External Listing
+                    </p>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Tickets and booking confirmation are handled directly by{" "}
+                      {getSourceMeta(e.external.source_name).label}.
+                    </p>
+                  </div>
+                </div>
+              ) : isPast ? (
                 <div className="space-y-4">
                   <div className="flex items-baseline justify-between">
                     <span className="font-display text-2xl font-bold text-muted-foreground">
@@ -638,7 +749,28 @@ function EventPage() {
               )}
 
               {/* Action Button */}
-              {isPast ? (
+              {e.sourceType === "external" && e.external ? (
+                isPast ? (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full text-base font-semibold h-12 rounded-2xl cursor-not-allowed opacity-75"
+                    disabled
+                  >
+                    Event Concluded
+                  </Button>
+                ) : (
+                  <Button
+                    variant="brand"
+                    size="lg"
+                    className="w-full text-base font-semibold h-12 rounded-2xl shadow-brand gap-2"
+                    onClick={() => setExternalRedirectOpen(true)}
+                  >
+                    <span>Book on {getSourceMeta(e.external.source_name).label}</span>
+                    <ExternalLink className="size-4" />
+                  </Button>
+                )
+              ) : isPast ? (
                 <Button
                   variant="outline"
                   size="lg"
@@ -679,22 +811,62 @@ function EventPage() {
         <div className="md:hidden fixed bottom-16 inset-x-0 z-20 bg-card/95 border-t border-border p-4 backdrop-blur shadow-lg flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground">
-              {isPast ? "Event concluded" : left === 0 ? "Sold out" : `${left} seats remaining`}
+              {isPast
+                ? "Event concluded"
+                : e.sourceType === "external" && e.external
+                  ? getSourceMeta(e.external.source_name).label
+                  : left === 0
+                    ? "Sold out"
+                    : `${left} seats remaining`}
             </p>
             <p className="font-display font-bold text-lg text-foreground">
-              {isPast ? "Concluded" : "Free Entry"}
+              {isPast
+                ? "Concluded"
+                : e.sourceType === "external" && e.external
+                  ? formatExternalPrice(
+                      e.external.is_free,
+                      e.external.ticket_price_min,
+                      e.external.ticket_price_max,
+                      e.external.currency,
+                    )
+                  : "Free Entry"}
             </p>
           </div>
           <Button
             variant={isPast ? "outline" : "brand"}
             size="lg"
-            className="rounded-2xl px-6"
-            disabled={isPast || left === 0}
-            onClick={() => !isPast && setRegisterOpen(true)}
+            className="rounded-2xl px-6 gap-1"
+            disabled={isPast || (e.sourceType !== "external" && left === 0)}
+            onClick={() => {
+              if (isPast) return;
+              if (e.sourceType === "external") {
+                setExternalRedirectOpen(true);
+              } else {
+                setRegisterOpen(true);
+              }
+            }}
           >
-            {isPast ? "Concluded" : left === 0 ? "Sold out" : "Register"}
+            <span>
+              {isPast
+                ? "Concluded"
+                : e.sourceType === "external"
+                  ? "Book Tickets"
+                  : left === 0
+                    ? "Sold out"
+                    : "Register"}
+            </span>
+            {!isPast && e.sourceType === "external" && <ExternalLink className="size-3.5" />}
           </Button>
         </div>
+      )}
+
+      {/* External Redirect Dialog */}
+      {e?.external && (
+        <ExternalRedirectDialog
+          open={externalRedirectOpen}
+          onOpenChange={setExternalRedirectOpen}
+          event={e.external}
+        />
       )}
 
       {/* Registration Dialog */}

@@ -66,7 +66,11 @@ function filterCreators(
   },
 ) {
   let res = creators.filter((c) => {
-    if (opts.niche && opts.niche !== "All" && c.category.toLowerCase() !== opts.niche.toLowerCase()) {
+    if (
+      opts.niche &&
+      opts.niche !== "All" &&
+      c.category.toLowerCase() !== opts.niche.toLowerCase()
+    ) {
       return false;
     }
     if (opts.location && opts.location !== "All") {
@@ -107,17 +111,17 @@ describe("Creator Discovery Workflow", () => {
   it("filters creators by search query across name, bio, niche, and location", () => {
     const techSearch = filterCreators(mockCreators, { query: "tech" });
     expect(techSearch).toHaveLength(1);
-    expect(techSearch[0].display_name).toBe("Rohan Sharma");
+    expect(techSearch[0]?.display_name).toBe("Rohan Sharma");
 
     const mumbaiSearch = filterCreators(mockCreators, { query: "mumbai" });
     expect(mumbaiSearch).toHaveLength(1);
-    expect(mumbaiSearch[0].id).toBe("1");
+    expect(mumbaiSearch[0]?.id).toBe("1");
   });
 
   it("filters creators by category/niche", () => {
     const fitnessCreators = filterCreators(mockCreators, { niche: "Fitness" });
     expect(fitnessCreators).toHaveLength(1);
-    expect(fitnessCreators[0].display_name).toBe("Amit Varma");
+    expect(fitnessCreators[0]?.display_name).toBe("Amit Varma");
 
     const allCreators = filterCreators(mockCreators, { niche: "All" });
     expect(allCreators).toHaveLength(4);
@@ -139,16 +143,16 @@ describe("Creator Discovery Workflow", () => {
 
   it("sorts creators by audience size, page views, and alphabetical name", () => {
     const byFollowers = filterCreators(mockCreators, { sortBy: "followers" });
-    expect(byFollowers[0].display_name).toBe("Amit Varma");
-    expect(byFollowers[byFollowers.length - 1].display_name).toBe("Neha Gupta");
+    expect(byFollowers[0]?.display_name).toBe("Amit Varma");
+    expect(byFollowers[byFollowers.length - 1]?.display_name).toBe("Neha Gupta");
 
     const byPopular = filterCreators(mockCreators, { sortBy: "popular" });
-    expect(byPopular[0].page_views).toBe(3400);
+    expect(byPopular[0]?.page_views).toBe(3400);
 
     const byName = filterCreators(mockCreators, { sortBy: "name" });
-    expect(byName[0].display_name).toBe("Amit Varma");
-    expect(byName[1].display_name).toBe("Neha Gupta");
-    expect(byName[2].display_name).toBe("Pooja Patel");
-    expect(byName[3].display_name).toBe("Rohan Sharma");
+    expect(byName[0]?.display_name).toBe("Amit Varma");
+    expect(byName[1]?.display_name).toBe("Neha Gupta");
+    expect(byName[2]?.display_name).toBe("Pooja Patel");
+    expect(byName[3]?.display_name).toBe("Rohan Sharma");
   });
 });
