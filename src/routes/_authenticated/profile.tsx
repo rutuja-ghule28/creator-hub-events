@@ -17,16 +17,22 @@ import {
   Clock,
   AlertTriangle,
   ExternalLink,
+  CalendarDays,
+  PlusCircle,
+  ShieldCheck,
+  Flag,
+  BarChart3,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { ALERT_KINDS, NICHES, errMsg, fmtCount, useMe } from "@/lib/cc";
+import { ALERT_KINDS, NICHES, errMsg, fmtCount, useMe, resolveUserRole } from "@/lib/cc";
 import { Avatar } from "@/components/cc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -71,6 +77,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
 
 function ProfilePage() {
   const { data: me } = useMe();
+  const roleInfo = resolveUserRole(me);
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<"account" | "notifications" | "role">("account");
 
@@ -400,8 +407,13 @@ function ProfilePage() {
                   {me?.profile?.full_name || me?.email}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">{me?.email}</p>
-                <span className="mt-1 inline-block rounded-full bg-brand/10 border border-brand/20 px-2 py-0.5 text-[10px] font-bold text-primary capitalize">
-                  {me?.roles?.[0] || "Attendee"}
+                <span
+                  className={cn(
+                    "mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold capitalize",
+                    roleInfo.badgeClass,
+                  )}
+                >
+                  {roleInfo.badgeLabel}
                 </span>
               </div>
             </div>
@@ -738,15 +750,141 @@ function ProfilePage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-sm">Current Active Role</p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {me?.roles?.join(", ") || "Attendee"}
-                      </p>
+                      <p className="text-base font-bold text-foreground">{roleInfo.displayTitle}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{roleInfo.description}</p>
                     </div>
-                    <span className="px-3 py-1 rounded-full bg-trust-soft text-trust font-semibold text-xs">
-                      Active
+                    <span
+                      className={cn(
+                        "px-3 py-1 rounded-full font-semibold text-xs border",
+                        roleInfo.badgeClass,
+                      )}
+                    >
+                      {roleInfo.badgeLabel}
                     </span>
                   </div>
+                  {me?.roles && me.roles.length > 0 && (
+                    <div className="pt-2 border-t border-border/50 flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <span>Assigned system roles:</span>
+                      <span className="font-mono text-foreground font-medium uppercase tracking-wider">
+                        {me.roles.join(", ")}
+                      </span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Dedicated Organizer Status Card */}
+                {(roleInfo.primaryRole === "organizer" || Boolean(me?.organizer)) && (
+                  <div className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="size-5 text-blue-500" />
+                        <h3 className="font-semibold text-base">Event Organizer Account</h3>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold text-xs border border-blue-500/20">
+                        Active Host
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      You are registered as an independent event organizer. You have direct access
+                      to host ticketed meetups, publish events, coordinate brand sponsorships, and
+                      manage attendee check-ins.
+                    </p>
+
+                    {me?.organizer && (
+                      <div className="rounded-xl bg-card/70 border border-border p-4 space-y-2.5 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Organization / Host Name:</span>
+                          <span className="font-semibold text-foreground">{me.organizer.name}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Location Base:</span>
+                          <span className="font-medium text-foreground">
+                            {me.organizer.location || "Pune"}
+                          </span>
+                        </div>
+                        {me.organizer.website_url && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Website:</span>
+                            <a
+                              href={me.organizer.website_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                            >
+                              <ExternalLink className="size-3" />
+                              <span className="max-w-[200px] truncate">
+                                {me.organizer.website_url.replace(/^https?:\/\//i, "")}
+                              </span>
+                            </a>
+                          </div>
+                        )}
+                        {me.organizer.private_details?.contact_email && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Contact Email:</span>
+                            <span className="font-medium text-foreground">
+                              {me.organizer.private_details.contact_email}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2.5 pt-2">
+                      <Link
+                        to="/creator/events"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-card border border-border hover:bg-muted transition-colors"
+                      >
+                        <CalendarDays className="size-3.5 text-primary" /> Manage Events
+                      </Link>
+                      <Link
+                        to="/creator/events/create"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-brand text-primary-foreground hover:opacity-90 transition-opacity"
+                      >
+                        <PlusCircle className="size-3.5" /> + Host Event
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dedicated Admin Status Card */}
+                {roleInfo.primaryRole === "admin" && (
+                  <div className="rounded-2xl border border-purple-500/30 bg-purple-500/5 p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="size-5 text-purple-500" />
+                        <h3 className="font-semibold text-base">Platform Administrator</h3>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold text-xs border border-purple-500/20">
+                        Administrator
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      You hold administrative privileges across CreatorConnect. You can review
+                      creator applications, moderate event submissions, and oversee platform health.
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2.5 pt-2">
+                      <Link
+                        to="/admin/verify"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-brand text-primary-foreground hover:opacity-90 transition-opacity"
+                      >
+                        <ShieldCheck className="size-3.5" /> Verification Queue
+                      </Link>
+                      <Link
+                        to="/admin/reports"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-card border border-border hover:bg-muted transition-colors"
+                      >
+                        <Flag className="size-3.5" /> Reports
+                      </Link>
+                      <Link
+                        to="/admin/platform"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-card border border-border hover:bg-muted transition-colors"
+                      >
+                        <BarChart3 className="size-3.5" /> Platform Health
+                      </Link>
+                    </div>
+                  </div>
+                )}
 
                 {/* Creator Application & Status Card */}
                 {me?.creator ? (
@@ -891,23 +1029,27 @@ function ProfilePage() {
                     </div>
                   )
                 ) : (
-                  <div className="rounded-2xl border border-brand/30 bg-brand/5 p-5 space-y-3">
-                    <h3 className="font-semibold text-sm flex items-center gap-2">
-                      <Sparkles className="size-4 text-primary" /> Want to host events as a Creator?
-                    </h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Apply for creator verification to publish meetups, workshops, and manage
-                      attendee check-ins.
-                    </p>
-                    <Button
-                      variant="brand"
-                      size="sm"
-                      onClick={handleOpenApplyModal}
-                      className="rounded-xl gap-2"
-                    >
-                      <Sparkles className="size-3.5" /> Apply for Creator Status
-                    </Button>
-                  </div>
+                  roleInfo.primaryRole === "attendee" &&
+                  !me?.organizer && (
+                    <div className="rounded-2xl border border-brand/30 bg-brand/5 p-5 space-y-3">
+                      <h3 className="font-semibold text-sm flex items-center gap-2">
+                        <Sparkles className="size-4 text-primary" /> Want to host events as a
+                        Creator?
+                      </h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Apply for creator verification to publish meetups, workshops, and manage
+                        attendee check-ins.
+                      </p>
+                      <Button
+                        variant="brand"
+                        size="sm"
+                        onClick={handleOpenApplyModal}
+                        className="rounded-xl gap-2"
+                      >
+                        <Sparkles className="size-3.5" /> Apply for Creator Status
+                      </Button>
+                    </div>
+                  )
                 )}
               </div>
             )}

@@ -39,6 +39,7 @@ import {
   fmtDateTime,
   fmtCount,
   seatsLeft,
+  resolveUserRole,
   type Creator,
   type EventWithCreator,
   type Me,
@@ -545,6 +546,7 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
 export function DesktopSidebar({ me }: { me?: Me | null | undefined }) {
   const router = useRouter();
   const currentPath = router.state.location.pathname;
+  const roleInfo = resolveUserRole(me);
 
   const isCreator = me?.roles?.includes("creator");
   const isOrganizer = me?.roles?.includes("organizer") || me?.profile?.account_type === "organizer";
@@ -750,9 +752,7 @@ export function DesktopSidebar({ me }: { me?: Me | null | undefined }) {
               <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
                 {me.profile?.full_name || "User Profile"}
               </p>
-              <p className="text-xs text-muted-foreground truncate capitalize">
-                {me.roles?.[0] || "Attendee"}
-              </p>
+              <p className="text-xs text-muted-foreground truncate">{roleInfo.badgeLabel}</p>
             </div>
           </Link>
         </div>

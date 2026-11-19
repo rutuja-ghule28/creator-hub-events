@@ -121,6 +121,90 @@ export function resolvePostAuthRedirect({
   return "/discover/1";
 }
 
+export type ResolvedRoleInfo = {
+  primaryRole: "admin" | "organizer" | "creator" | "attendee";
+  badgeLabel: string;
+  displayTitle: string;
+  badgeClass: string;
+  description: string;
+};
+
+export function resolveUserRole(me: Me | null | undefined): ResolvedRoleInfo {
+  if (!me) {
+    return {
+      primaryRole: "attendee",
+      badgeLabel: "Attendee",
+      displayTitle: "Attendee",
+      badgeClass: "bg-brand/10 text-primary border-brand/20",
+      description: "Explore upcoming events, reserve tickets, and follow favorite creators.",
+    };
+  }
+
+  const roles = me.roles ?? [];
+  const accountType = me.profile?.account_type?.toLowerCase();
+
+  // Priority 1: Admin
+  if (roles.includes("admin")) {
+    return {
+      primaryRole: "admin",
+      badgeLabel: "Admin",
+      displayTitle: "Platform Administrator",
+      badgeClass: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      description: "Platform oversight, verification queue review, and incident moderation.",
+    };
+  }
+
+  // Priority 2: Organizer
+  if (roles.includes("organizer") || accountType === "organizer" || Boolean(me.organizer)) {
+    return {
+      primaryRole: "organizer",
+      badgeLabel: "Organizer",
+      displayTitle: "Event Organizer & Host",
+      badgeClass: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      description: "Host ticketed meetups, manage venues, and curate attendee experiences.",
+    };
+  }
+
+  // Priority 3: Verified Creator
+  const isVerifiedCreator =
+    roles.includes("creator") ||
+    me.creator?.verified === true ||
+    me.creator?.verification_status === "verified";
+
+  if (isVerifiedCreator) {
+    return {
+      primaryRole: "creator",
+      badgeLabel: "Creator",
+      displayTitle: "Verified Creator",
+      badgeClass: "bg-trust-soft text-trust border-trust/20",
+      description: "Publish workshops, host campaigns, and connect with your audience.",
+    };
+  }
+
+  // Priority 4: Pending / Submitted Creator
+  if (accountType === "creator" || me.creator) {
+    const isPending = me.creator?.verification_status === "pending" || !me.creator;
+    return {
+      primaryRole: "creator",
+      badgeLabel: isPending ? "Creator (Pending)" : "Creator",
+      displayTitle: isPending ? "Creator (Under Review)" : "Creator",
+      badgeClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      description: isPending
+        ? "Your creator profile is currently undergoing verification by platform administrators."
+        : "Creator profile submitted.",
+    };
+  }
+
+  // Priority 5: Attendee default
+  return {
+    primaryRole: "attendee",
+    badgeLabel: "Attendee",
+    displayTitle: "Attendee",
+    badgeClass: "bg-brand/10 text-primary border-brand/20",
+    description: "Explore upcoming events, reserve tickets, and follow favorite creators.",
+  };
+}
+
 export const meQuery = queryOptions({
   queryKey: ["me"],
   queryFn: async (): Promise<Me | null> => {
